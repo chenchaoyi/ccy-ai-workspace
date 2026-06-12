@@ -108,6 +108,14 @@ keybind = cmd+shift+i=prompt_surface_title
 # Claude Code:让 Shift+Enter 在输入框内换行(配合 tmux 的 extended-keys 透传)
 keybind = shift+enter=text:\x1b[13;2u
 
+# tmux prefix the comfy way: Cmd+B sends Ctrl+B (\x02), so Cmd+B acts as the
+# prefix inside Ghostty. tmux itself is untouched — Ctrl+B still works
+# everywhere (ssh, other terminals); outside tmux \x02 is just cursor-left.
+# 舒服地按 tmux prefix:Cmd+B 直接发送 Ctrl+B 字节(\x02),在 Ghostty 里等同
+# prefix。tmux 配置不动 —— Ctrl+B 在任何地方(ssh/其它终端)依然可用;
+# 不在 tmux 里时 \x02 只是光标左移一格,无副作用。
+keybind = cmd+b=text:\x02
+
 # --- Behavior (agent-friendly) / 行为(对 agent 友好)---
 # Ring on bell so finished / awaiting-input agents grab attention
 # 响铃提醒:跑完/等待输入的 agent 能引起注意

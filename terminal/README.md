@@ -120,7 +120,7 @@ Ghostty sees the real directory even when you live in tmux.
 | Item | Choice | Why |
 |------|--------|-----|
 | Terminal | Ghostty | GPU rendering, low memory, native splits |
-| Prefix key | **keep Ctrl+b** | don't fight muscle memory |
+| Prefix key | **Ctrl+b**, plus **Cmd+B** in Ghostty (sends `\x02`) | comfier to press; tmux untouched, Ctrl+b still works over ssh |
 | Pane switching | **vi-style h/j/k/l** (arrows also work) | vim muscle memory |
 | Persistence | tmux + resurrect + continuum | restore session/window/cwd across restarts |
 | Parallel agents | one session per project, tasks per window | see docs/04 |

@@ -111,7 +111,7 @@ tmux.conf 已开 `allow-passthrough on`),常驻 tmux 时 Ghostty 也能拿到真
 | 项 | 选择 | 为什么 |
 |----|------|--------|
 | 终端 | Ghostty | GPU 渲染、省内存、原生分屏 |
-| 前缀键 | **保留 Ctrl+b** | 不折腾肌肉记忆 |
+| 前缀键 | **Ctrl+b**,Ghostty 里另配 **Cmd+B**(发送 `\x02`) | 按起来更舒服;tmux 零改动,ssh 下 Ctrl+b 照常可用 |
 | pane 切换 | **vi 风格 h/j/k/l**(方向键也可) | 习惯 vim 手感 |
 | 持久化 | tmux + resurrect + continuum | 跨重启恢复 session/window/cwd,比快照工具更彻底 |
 | 并行 agent | 一项目一 session,任务分 window | 见 docs/04 |
