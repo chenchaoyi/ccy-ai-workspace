@@ -318,9 +318,13 @@ install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
 # from any directory after reopening Ghostty to reattach every tmux session.
 # 安装到 PATH(~/.local/bin)的独立命令行,与 shell 配置无关:重开 Ghostty 后
 # 在任意目录运行 `tmux-restore` 即可一键接回全部 tmux session。
-say "== 3/6 tmux-restore CLI ==" "== 3/6 tmux-restore 命令行 =="
+say "== 3/6 CLI tools (tmux-restore, tmux-overview) ==" "== 3/6 命令行工具(tmux-restore、tmux-overview)=="
 install_file "$DIR/scripts/tmux-restore" "$HOME/.local/bin/tmux-restore"
 chmod +x "$HOME/.local/bin/tmux-restore"
+# Session summary shown by the prefix+g popup; also runnable from any shell
+# 前缀+g 弹窗显示的 session 概览;也可在任意 shell 里直接运行
+install_file "$DIR/scripts/tmux-overview" "$HOME/.local/bin/tmux-overview"
+chmod +x "$HOME/.local/bin/tmux-overview"
 # Legacy home-dir copy from earlier installs: back up and remove
 # 早期版本装在 home 根目录的旧副本:备份后移除
 if [ -f "$HOME/tmux-restore" ]; then

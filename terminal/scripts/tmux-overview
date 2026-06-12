@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# ============================================================================
+# tmux-overview — one-screen summary of all tmux sessions / windows / panes
+# tmux-overview —— 一屏汇总所有 tmux session / window / pane
+#
+# Usage / 用法:
+#   tmux-overview              print the summary | 打印汇总
+#   (in tmux / tmux 内)        prefix + g pops it up | 前缀 + g 弹窗显示
+#
+# Shows: total counts, then per session — attached state, windows, panes,
+# and each window's name/pane-count/active/zoom/activity flags.
+# 展示:总数,以及每个 session 的连接状态、window 数、pane 数,
+# 和每个 window 的名字/pane 数/活跃/放大/新输出标记。
+#
+# Restore: installed to ~/.local/bin/tmux-overview by terminal/install.sh
+# 复原:   由 terminal/install.sh 安装到 ~/.local/bin/tmux-overview
+# ============================================================================
+set -u
+
+# tmux may be absent from PATH when invoked from a bare popup environment
+# 从精简环境的 popup 里调用时 tmux 可能不在 PATH 上
+TMUX_BIN="$(command -v tmux || true)"
+if [ -z "$TMUX_BIN" ]; then
+  for p in /opt/homebrew/bin/tmux /usr/local/bin/tmux; do
+    [ -x "$p" ] && TMUX_BIN="$p" && break
+  done
+fi
+if [ -z "$TMUX_BIN" ] || ! "$TMUX_BIN" has-session 2>/dev/null; then
+  echo "No tmux server running / 没有运行中的 tmux server"
+  exit 1
+fi
+
+B=$'\033[1m'; D=$'\033[2m'; GN=$'\033[32m'; YL=$'\033[33m'; CY=$'\033[36m'; R0=$'\033[0m'
+
+total_s="$("$TMUX_BIN" list-sessions 2>/dev/null | grep -c . || true)"
+total_w="$("$TMUX_BIN" list-windows -a 2>/dev/null | grep -c . || true)"
+total_p="$("$TMUX_BIN" list-panes -a 2>/dev/null | grep -c . || true)"
+
+# Highlight the session this popup/shell lives in / 标出当前所在的 session
+current=""
+[ -n "${TMUX:-}" ] && current="$("$TMUX_BIN" display-message -p '#{session_name}' 2>/dev/null || true)"
+
+printf '%stmux overview%s — %s sessions · %s windows · %s panes\n' \
+  "$B" "$R0" "$total_s" "$total_w" "$total_p"
+echo
+
+while IFS='|' read -r name attached nwin; do
+  panes="$("$TMUX_BIN" list-panes -s -t "$name" 2>/dev/null | grep -c . || true)"
+  if [ "${attached:-0}" -gt 0 ]; then
+    mark="${GN}●${R0}"; state="attached/已连接"
+  else
+    mark="${YL}○${R0}"; state="detached/待接回"
+  fi
+  cur=""
+  [ -n "$current" ] && [ "$name" = "$current" ] && cur="  ${CY}← current/当前${R0}"
+  printf '%s %s%-22s%s %s(%s)%s  %s windows · %s panes%s\n' \
+    "$mark" "$B" "$name" "$R0" "$D" "$state" "$R0" "$nwin" "$panes" "$cur"
+  # Per-window detail: * active, Z zoomed, • unseen output
+  # 每个 window 的明细:* 当前活跃,Z 有 pane 放大,• 有未读输出
+  "$TMUX_BIN" list-windows -t "$name" \
+    -F "    #{window_index}: #{window_name}#{?window_active, *,}#{?window_zoomed_flag, Z,}#{?window_activity_flag, •,}  ${D}(#{window_panes} panes)${R0}" 2>/dev/null
+  echo
+done < <("$TMUX_BIN" list-sessions -F '#{session_name}|#{session_attached}|#{session_windows}' 2>/dev/null)
+
+printf '%s* active  Z zoomed  • new output   |   prefix+s switch · tmux-restore reattach · q close%s\n' "$D" "$R0"
