@@ -124,6 +124,12 @@ the display** — sessions keep running and `tmux-restore` reattaches them
 anytime; a reboot kills the server too, but continuum's 5-minute autosaves
 restore the layout (see below). Full concept guide: `docs/02-tmux-concepts.en.md`.
 
+Corollary: **names belong in the state layer too.** Ghostty tab titles are
+configured to mirror "session — window" automatically (tmux `set-titles`),
+so they come back correct after a reattach; don't rename Ghostty tabs by hand
+(it gets overridden, and is lost on quit anyway) — rename the session
+(`tmux rename-session`) or window (`prefix+,`) instead.
+
 ## Reattaching tmux sessions (`tmux-restore`)
 
 Quitting Ghostty leaves the tmux server and all sessions alive — only the

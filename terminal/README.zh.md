@@ -116,6 +116,11 @@ tmux server(整台机器只有一个,装着所有状态)
 `tmux-restore` 随时接回;重启电脑连 server 也没了,但 continuum 每 5 分钟的
 存档能恢复布局(见下文)。概念详解见 `docs/02-tmux-concepts.zh.md`。
 
+推论:**命名也要写在状态层**。Ghostty tab 标题已配置为自动显示
+"session 名 — window 名"(tmux `set-titles`),接回后名字自动正确;
+不要手动给 Ghostty tab 改名(会被覆盖,且 quit 后必丢),
+要改名就改 session(`tmux rename-session`)或 window(`前缀+,`)。
+
 ## 接回 tmux session(`tmux-restore`)
 
 quit Ghostty 后 tmux server 和所有 session 都还活着,消失的只是 Ghostty 的
