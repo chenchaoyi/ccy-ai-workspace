@@ -105,6 +105,29 @@ last autosave (every 5 min) — sessions, windows, per-pane directories and
 on-screen text. **Running programs are not restarted**; each pane comes back as
 a shell in its old directory (e.g. restart Claude Code with `claude --resume`).
 
+## Live session overview (`prefix+g`, or `tmux-overview`)
+
+Press **`prefix + g`** anywhere — even while a full-screen program (Claude
+Code, vim, …) is running — and a size-fitted popup floats over it without
+interrupting anything; any key closes it:
+
+```
+tmux overview — 2 sessions · 3 windows · 5 panes
+
+▶ ccy-ai-workspace     1 window · 1 pane
+    0: ccy-ai-workspace *  (1 pane)
+
+● tryout3              2 windows · 4 panes
+    0: wifiscope  (1 pane)
+    1: claude code *  (3 panes)
+
+▶ current  ● attached  ○ detached   * active  Z zoomed  • new output
+```
+
+This works because tmux intercepts the prefix before the foreground program
+sees it. The same summary is available as a CLI from any shell:
+`tmux-overview`. The key cheatsheet lives next door on **`prefix + G`**.
+
 ## Working-directory inheritance (new windows/tabs keep your cwd)
 
 Ghostty's `window-inherit-working-directory` needs the shell to **report** its

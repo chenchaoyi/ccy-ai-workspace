@@ -97,6 +97,28 @@ session/window 结构、各 pane 的目录和屏幕文本都会回来。**正在
 自动重启**,每个 pane 恢复成停在原目录的 shell(比如 Claude Code 用
 `claude --resume` 重新拉起)。
 
+## session 实时概览(`前缀+g`,或 `tmux-overview`)
+
+在任何地方按 **`前缀 + g`** —— 包括 Claude Code、vim 等全屏程序正在运行时 ——
+一个按内容自适应大小的弹窗会悬浮在上方,完全不打断当前工作,按任意键关闭:
+
+```
+tmux overview — 2 sessions · 3 windows · 5 panes
+
+▶ ccy-ai-workspace     1 window · 1 pane
+    0: ccy-ai-workspace *  (1 pane)
+
+● tryout3              2 windows · 4 panes
+    0: wifiscope  (1 pane)
+    1: claude code *  (3 panes)
+
+▶ 当前  ● 已连接  ○ 待接回   * 活跃  Z 放大  • 新输出
+```
+
+原理:前缀键由 tmux 拦截,轮不到 pane 里的前台程序,所以全屏 agent 跑着也能
+随时呼出。同样的汇总在任意 shell 里可用 CLI 查看:`tmux-overview`。
+命令速查表在隔壁:**`前缀 + G`**。
+
 ## 新窗口继承工作目录
 
 Ghostty 的 `window-inherit-working-directory` 生效的前提是 shell 主动**上报**

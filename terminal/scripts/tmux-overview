@@ -5,12 +5,13 @@
 #
 # Usage / 用法:
 #   tmux-overview              print the summary | 打印汇总
-#   (in tmux / tmux 内)        prefix + g pops it up | 前缀 + g 弹窗显示
+#   tmux-overview --popup      open it in a size-fitted tmux popup
+#                              (what prefix+g runs) | 自适应高度弹窗(前缀+g)
 #
-# Shows: total counts, then per session — attached state, windows, panes,
-# and each window's name/pane-count/active/zoom/activity flags.
-# 展示:总数,以及每个 session 的连接状态、window 数、pane 数,
-# 和每个 window 的名字/pane 数/活跃/放大/新输出标记。
+# Shows: totals, then per session — current marker, attached state, window
+# and pane counts, and each window's name with active/zoom/activity flags.
+# 展示:总数;每个 session 的当前标记、连接状态、window/pane 数量,
+# 以及每个 window 的名字与 活跃/放大/新输出 标记。
 #
 # Restore: installed to ~/.local/bin/tmux-overview by terminal/install.sh
 # 复原:   由 terminal/install.sh 安装到 ~/.local/bin/tmux-overview
@@ -30,36 +31,75 @@ if [ -z "$TMUX_BIN" ] || ! "$TMUX_BIN" has-session 2>/dev/null; then
   exit 1
 fi
 
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 B=$'\033[1m'; D=$'\033[2m'; GN=$'\033[32m'; YL=$'\033[33m'; CY=$'\033[36m'; R0=$'\033[0m'
 
-total_s="$("$TMUX_BIN" list-sessions 2>/dev/null | grep -c . || true)"
-total_w="$("$TMUX_BIN" list-windows -a 2>/dev/null | grep -c . || true)"
-total_p="$("$TMUX_BIN" list-panes -a 2>/dev/null | grep -c . || true)"
+pl() {  # pl <n> <noun> -> "1 window" / "3 windows"
+  if [ "$1" -eq 1 ]; then printf '%s %s' "$1" "$2"; else printf '%s %ss' "$1" "$2"; fi
+}
 
-# Highlight the session this popup/shell lives in / 标出当前所在的 session
-current=""
-[ -n "${TMUX:-}" ] && current="$("$TMUX_BIN" display-message -p '#{session_name}' 2>/dev/null || true)"
+render() {
+  local total_s total_w total_p current name attached nwin panes mark
+  total_s="$("$TMUX_BIN" list-sessions 2>/dev/null | grep -c . || true)"
+  total_w="$("$TMUX_BIN" list-windows -a 2>/dev/null | grep -c . || true)"
+  total_p="$("$TMUX_BIN" list-panes -a 2>/dev/null | grep -c . || true)"
+  current=""
+  [ -n "${TMUX:-}" ] && current="$("$TMUX_BIN" display-message -p '#{session_name}' 2>/dev/null || true)"
 
-printf '%stmux overview%s — %s sessions · %s windows · %s panes\n' \
-  "$B" "$R0" "$total_s" "$total_w" "$total_p"
-echo
-
-while IFS='|' read -r name attached nwin; do
-  panes="$("$TMUX_BIN" list-panes -s -t "$name" 2>/dev/null | grep -c . || true)"
-  if [ "${attached:-0}" -gt 0 ]; then
-    mark="${GN}●${R0}"; state="attached/已连接"
-  else
-    mark="${YL}○${R0}"; state="detached/待接回"
-  fi
-  cur=""
-  [ -n "$current" ] && [ "$name" = "$current" ] && cur="  ${CY}← current/当前${R0}"
-  printf '%s %s%-22s%s %s(%s)%s  %s windows · %s panes%s\n' \
-    "$mark" "$B" "$name" "$R0" "$D" "$state" "$R0" "$nwin" "$panes" "$cur"
-  # Per-window detail: * active, Z zoomed, • unseen output
-  # 每个 window 的明细:* 当前活跃,Z 有 pane 放大,• 有未读输出
-  "$TMUX_BIN" list-windows -t "$name" \
-    -F "    #{window_index}: #{window_name}#{?window_active, *,}#{?window_zoomed_flag, Z,}#{?window_activity_flag, •,}  ${D}(#{window_panes} panes)${R0}" 2>/dev/null
+  printf '%stmux overview%s — %s · %s · %s\n' "$B" "$R0" \
+    "$(pl "$total_s" session)" "$(pl "$total_w" window)" "$(pl "$total_p" pane)"
   echo
-done < <("$TMUX_BIN" list-sessions -F '#{session_name}|#{session_attached}|#{session_windows}' 2>/dev/null)
 
-printf '%s* active  Z zoomed  • new output   |   prefix+s switch · tmux-restore reattach · q close%s\n' "$D" "$R0"
+  while IFS='|' read -r name attached nwin; do
+    panes="$("$TMUX_BIN" list-panes -s -t "$name" 2>/dev/null | grep -c . || true)"
+    # ▶ current (cyan) / ● attached (green) / ○ detached (yellow)
+    if [ -n "$current" ] && [ "$name" = "$current" ]; then
+      mark="${CY}▶${R0}"
+    elif [ "${attached:-0}" -gt 0 ]; then
+      mark="${GN}●${R0}"
+    else
+      mark="${YL}○${R0}"
+    fi
+    printf '%s %s%-20s%s %s · %s\n' "$mark" "$B" "$name" "$R0" \
+      "$(pl "$nwin" window)" "$(pl "$panes" pane)"
+    # Per-window: * active, Z zoomed, • unseen output; pane count pluralized
+    # by tmux's own conditional format.
+    # 每个 window:* 活跃,Z 放大,• 未读输出;pane 单复数由 tmux 条件格式处理。
+    "$TMUX_BIN" list-windows -t "$name" \
+      -F "    #{window_index}: #{window_name}#{?window_active, *,}#{?window_zoomed_flag, Z,}#{?window_activity_flag, •,}  ${D}(#{?#{==:#{window_panes},1},1 pane,#{window_panes} panes})${R0}" 2>/dev/null
+    echo
+  done < <("$TMUX_BIN" list-sessions -F '#{session_name}|#{session_attached}|#{session_windows}' 2>/dev/null)
+
+  printf '%s▶ current/当前  ● attached/已连接  ○ detached/待接回%s\n' "$D" "$R0"
+  printf '%s* active/活跃  Z zoomed/放大  • new output/新输出%s\n' "$D" "$R0"
+}
+
+case "${1:-}" in
+  -h|--help)
+    awk 'NR>1 { if (/^#/) sub(/^# ?/,"") ; else exit ; print }' "$0"; exit 0;;
+
+  --popup)
+    # Fit the popup to the content; fall back to a pager only when it can't fit.
+    # 弹窗高度按内容自适应;放不下时才退回分页器。
+    if [ -z "${TMUX:-}" ]; then render; exit 0; fi   # not inside tmux: just print
+    content=$(( $(render | wc -l | tr -d ' ') + 3 )) # + popup border & hold hint
+    maxh="$("$TMUX_BIN" display-message -p '#{client_height}' 2>/dev/null || echo 40)"
+    maxh=$((maxh * 9 / 10))
+    if [ "$content" -le "$maxh" ]; then
+      exec "$TMUX_BIN" display-popup -E -w 64 -h "$content" \
+        "$SELF --hold"
+    else
+      exec "$TMUX_BIN" display-popup -E -w 64 -h "$maxh" \
+        "$SELF | less -R"
+    fi;;
+
+  --hold)
+    # Print, then close on any key (nicer than less's (END) for short content)
+    # 打印后按任意键关闭(短内容下比 less 的 (END) 提示干净)
+    render
+    printf '%s%s%s' "$D" "any key to close / 按任意键关闭" "$R0"
+    IFS= read -r -n1 -s _ 2>/dev/null || true;;
+
+  *)
+    render;;
+esac
