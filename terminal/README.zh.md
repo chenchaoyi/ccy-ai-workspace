@@ -196,6 +196,7 @@ tmux.conf 已开 `allow-passthrough on`),常驻 tmux 时 Ghostty 也能拿到真
 | 前缀键 | **Ctrl+b**,Ghostty 里另配 **Cmd+B**(发送 `\x02`) | 按起来更舒服;tmux 零改动,ssh 下 Ctrl+b 照常可用 |
 | pane 切换 | **vi 风格 h/j/k/l**(方向键也可) | 习惯 vim 手感 |
 | 持久化 | tmux + resurrect + continuum | 跨重启恢复 session/window/cwd,比快照工具更彻底 |
+| tab 命名 | 名字起在 tmux 的 session/window 上,**`set-titles` 自动映射到 Ghostty tab 标题** | 名字活在状态层 —— quit/重启不丢,`tmux-restore` 接回后自动正确,零手动命名 |
 | 现在跑着什么? | **前缀+g** session 概览弹窗(shell 里也可 `tmux-overview`) | 一眼看清 session/window/pane 数量与明细 |
 | 忘了按键? | **前缀+G** 速查表弹窗;前缀+? 全量键位;前缀+/ 再按某键=解释它 | 不离开 tmux 随手查 |
 | 并行 agent | 一项目一 session,任务分 window | 见 docs/04 |

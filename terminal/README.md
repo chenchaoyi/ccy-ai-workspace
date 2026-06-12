@@ -211,6 +211,7 @@ Ghostty sees the real directory even when you live in tmux.
 | Prefix key | **Ctrl+b**, plus **Cmd+B** in Ghostty (sends `\x02`) | comfier to press; tmux untouched, Ctrl+b still works over ssh |
 | Pane switching | **vi-style h/j/k/l** (arrows also work) | vim muscle memory |
 | Persistence | tmux + resurrect + continuum | restore session/window/cwd across restarts |
+| Tab naming | name sessions/windows in tmux; **`set-titles` mirrors them onto Ghostty tabs** | titles live in the state layer — survive quit/reboot, auto-correct after `tmux-restore`, zero manual renaming |
 | What's running? | **prefix+g** session overview popup (also `tmux-overview` in any shell) | counts + per-session windows/panes at a glance |
 | Forgot a key? | **prefix+G** cheatsheet popup; prefix+? full list; prefix+/ then a key explains it | look it up without leaving tmux |
 | Parallel agents | one session per project, tasks per window | see docs/04 |
