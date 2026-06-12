@@ -17,7 +17,8 @@ terminal/
 ├── ghostty/
 │   └── config           Ghostty config (soft dark / agent-friendly)
 ├── tmux/
-│   └── tmux.conf        tmux config (keeps default Ctrl+b prefix)
+│   ├── tmux.conf        tmux config (keeps default Ctrl+b prefix)
+│   └── cheatsheet.txt   quick reference shown by the prefix+g popup
 ├── scripts/
 │   └── tmux-restore     restore the Ghostty ↔ tmux workspace (reattach all sessions)
 ├── shell/
@@ -127,6 +128,7 @@ Ghostty sees the real directory even when you live in tmux.
 | Prefix key | **Ctrl+b**, plus **Cmd+B** in Ghostty (sends `\x02`) | comfier to press; tmux untouched, Ctrl+b still works over ssh |
 | Pane switching | **vi-style h/j/k/l** (arrows also work) | vim muscle memory |
 | Persistence | tmux + resurrect + continuum | restore session/window/cwd across restarts |
+| Forgot a key? | **prefix+g** cheatsheet popup; prefix+? full list; prefix+/ then a key explains it | look it up without leaving tmux |
 | Parallel agents | one session per project, tasks per window | see docs/04 |
 
 See `docs/` for the full rationale and background.

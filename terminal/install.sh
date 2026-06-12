@@ -307,9 +307,11 @@ if [ -e "$LEGACY" ]; then
       "↪ 旧配置已停用: $LEGACY -> $LEGACY.disabled-$TS(备份: $bak)"
 fi
 
-# ---- 2) tmux config / tmux 配置 -------------------------------------------
+# ---- 2) tmux config + cheatsheet / tmux 配置 + 速查表 -----------------------
 say "== 2/6 tmux config ==" "== 2/6 tmux 配置 =="
 install_file "$DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
+# Quick-reference shown by the prefix+g popup / 前缀+g 弹窗显示的速查表
+install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
 
 # ---- 3) tmux-restore CLI / tmux-restore 命令行 ------------------------------
 # A standalone, shell-agnostic CLI on PATH (~/.local/bin): run `tmux-restore`
