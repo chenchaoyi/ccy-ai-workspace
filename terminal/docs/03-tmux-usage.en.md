@@ -41,6 +41,15 @@ session: saas
 | Rename | `prefix + ,` |
 | Close | `prefix + &` |
 
+> **Window naming (tuned in this config)**: by default tmux renames windows to the
+> running program (everything shows "bash" — useless). This config instead:
+> **unnamed windows show their directory** (e.g. `saas`), and a **manual name via
+> `prefix + ,` sticks** (e.g. `claude`/`dev`/`git`); programs can't silently rename
+> them. A `•` appears in the status bar when a background window has new output —
+> handy for spotting "which agent just finished". **Name each window by role** so the
+> status bar tells you what every window is doing at a glance. To peek at all windows,
+> `prefix + w` opens a window tree with live preview.
+
 ### Pane (split)
 | Action | Key |
 |--------|-----|
