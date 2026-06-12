@@ -38,11 +38,15 @@ terminal/
 #   brew install --cask ghostty ; brew install tmux
 git clone git@github.com:chenchaoyi/ccy-ai-workspace.git
 cd ccy-ai-workspace
-bash terminal/install.sh
+bash terminal/install.sh              # English output (default)
+bash terminal/install.sh --lang=zh    # 中文输出
 ```
 
 The installer checks both tools' presence and versions up front (and offers a
-`brew upgrade` — after asking — when a newer one is available).
+`brew upgrade` — after asking — when a newer one is available). Flags:
+`--lang=en|zh` output language, `-y/--yes` auto-confirm prompts (agent/CI
+friendly; without it non-interactive runs never block), `-h/--help` full help
+including output markers and exit codes.
 
 The script **copies** configs to:
 - `~/.config/ghostty/config`
