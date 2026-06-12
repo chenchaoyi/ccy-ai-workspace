@@ -1,0 +1,121 @@
+# ============================================================================
+# Ghostty config  —  ccy
+# Goal:  replicate Warp "phenomenon" feel; friendly to coding agents / tmux
+# 目标:  复刻 Warp "phenomenon" 手感,对 coding agent / tmux 友好
+# Restore: see terminal/README.md (copied to ~/.config/ghostty/config by install.sh)
+# 复原:   见 terminal/README.md(由 install.sh 拷贝到 ~/.config/ghostty/config)
+# Notes:  see terminal/docs/01-ghostty.en.md / .zh.md (contrast/glare tuning)
+# 说明:   见 terminal/docs/01-ghostty.zh.md(含对比度/晃眼问题的调校结论)
+# ============================================================================
+
+# --- Typography / 排版 ---
+# Match Warp: Hack @ 15pt / 匹配 Warp:Hack 字体 15pt
+font-family = Hack
+font-size = 15
+# font-thicken=false: disable faux-bold stroke -> less glare on white text
+# font-thicken=false:关掉伪加粗描边 -> 减轻白字"晃眼"
+font-thicken = false
+adjust-cell-height = 2
+
+# --- Theme and Colors / 主题与配色 ---
+# Soft dark: bg raised to #17171a, fg lowered to warm off-white #d4d2cc,
+#   dropping contrast from ~17:1 to ~10:1 — readable but not harsh.
+# 柔和暗色:背景抬到 #17171a、前景降到暖灰白 #d4d2cc,
+#   把对比度从 ~17:1 降到 ~10:1,清晰但不刺眼。
+background = 17171a
+foreground = d4d2cc
+cursor-color = bbc1ff
+selection-background = 2a2a33
+selection-foreground = ffffff
+# Alt: Catppuccin auto light/dark (disabled while matching Warp)
+# 备选:Catppuccin 自动明暗切换(当前为匹配 Warp 而禁用)
+#theme = light:Catppuccin Latte,dark:Catppuccin Mocha
+#theme = dark:Catppuccin Mocha
+
+# --- Window and Appearance / 窗口与外观 ---
+background-opacity = 1
+background-blur-radius = 20
+macos-titlebar-style = native
+window-padding-x = 10
+window-padding-y = 8
+# Saves window geometry/splits; cwd-restore caveats in docs/01-ghostty
+# 保存窗口几何/分屏;cwd 恢复的局限见 docs/01-ghostty
+window-save-state = always
+window-theme = auto
+
+# --- Cursor / 光标 ---
+cursor-style = bar
+cursor-style-blink = true
+cursor-opacity = 0.9
+
+# --- Mouse / 鼠标 ---
+mouse-hide-while-typing = true
+copy-on-select = clipboard
+
+# --- Quick Terminal (Quake-style dropdown) / 快捷下拉终端 ---
+quick-terminal-position = top
+quick-terminal-screen = mouse
+quick-terminal-autohide = true
+quick-terminal-animation-duration = 0.15
+
+# --- Security / 安全 ---
+clipboard-paste-protection = true
+clipboard-paste-bracketed-safe = true
+
+# --- Shell Integration / Shell 集成 ---
+shell-integration = detect
+
+# --- Keybindings / 快捷键 ---
+# Tabs / 标签页
+keybind = cmd+t=new_tab
+keybind = cmd+alt+left=previous_tab
+keybind = cmd+alt+right=next_tab
+keybind = cmd+w=close_surface
+
+# Splits / 分屏
+keybind = cmd+d=new_split:right
+keybind = cmd+shift+d=new_split:down
+keybind = cmd+left=goto_split:left
+keybind = cmd+right=goto_split:right
+keybind = cmd+up=goto_split:top
+keybind = cmd+down=goto_split:bottom
+
+# Font size / 字号
+keybind = cmd+plus=increase_font_size:1
+keybind = cmd+minus=decrease_font_size:1
+keybind = cmd+zero=reset_font_size
+
+# Quick terminal global hotkey / 下拉终端全局热键
+keybind = global:ctrl+grave_accent=toggle_quick_terminal
+
+# Splits management / 分屏管理
+keybind = cmd+e=equalize_splits
+keybind = cmd+f=toggle_split_zoom
+
+# Reload config / 重载配置
+keybind = cmd+shift+comma=reload_config
+
+# Jump between prompts in long agent logs (needs shell-integration)
+# 在长 agent 日志里跳转命令提示符(需 shell-integration)
+keybind = cmd+shift+up=jump_to_prompt:-1
+keybind = cmd+shift+down=jump_to_prompt:1
+
+# Rename current tab (handy for naming agent sessions)
+# 重命名当前 tab(方便给 agent 会话命名)
+keybind = cmd+shift+i=prompt_surface_title
+
+# Claude Code: make Shift+Enter insert a newline (pairs with tmux extended-keys)
+# Claude Code:让 Shift+Enter 在输入框内换行(配合 tmux 的 extended-keys 透传)
+keybind = shift+enter=text:\x1b[13;2u
+
+# --- Behavior (agent-friendly) / 行为(对 agent 友好)---
+# Ring on bell so finished / awaiting-input agents grab attention
+# 响铃提醒:跑完/等待输入的 agent 能引起注意
+bell-features = audio,attention,title
+# Option acts as Alt: alt+arrows / alt+backspace word-nav in shells & editors
+# Option 当 Alt:alt+方向/alt+backspace 在 shell 与编辑器里按词移动
+macos-option-as-alt = true
+
+# --- Performance / 性能 ---
+# Generous scrollback (25MB) / 充裕回滚缓冲(25MB)
+scrollback-limit = 25000000
