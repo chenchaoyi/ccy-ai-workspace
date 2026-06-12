@@ -66,6 +66,56 @@ bash terminal/install.sh              # English output(默认)
 2. **tmux**:启动 `tmux` → 按 `Ctrl+b` 然后 `I`(大写)安装插件。
 3. **验证持久化**:`Ctrl+b` 然后 `Ctrl-s` 手动存一次;重启 tmux 应自动恢复布局与各窗格目录。
 
+## 背景知识:Ghostty 与 tmux 的概念分层
+
+最容易混淆的点:**Ghostty 和 tmux 各有自己的 "window",但完全是两回事**。
+一句话类比:**Ghostty 是显示器,tmux 是主机**。拔掉显示器(quit Ghostty),
+主机里的东西(session)照样跑;重新接上(`tmux-restore`)画面就回来了。
+
+**上层 —— Ghostty,负责"显示"(GUI 程序,Cmd+Q 就没了):**
+
+```text
+┌─ Ghostty window(macOS 窗口,Cmd+N)──────────────┐
+│  tab 栏(Cmd+T):   [ blog ]   [ shop ]           │
+│ ┌─────────────────────────────────────────────────┐
+│ │                                                 │
+│ │   当前 tab 的内容区 = 它 attach 的那个          │
+│ │   tmux session 正在显示的画面                   │
+│ │                                                 │
+│ └─────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────┘
+        │ tab[blog] attach          │ tab[shop] attach
+        ▼                           ▼
+```
+
+**下层 —— tmux,负责"状态"(后台进程,quit Ghostty 也不死):**
+
+```text
+tmux server(整台机器只有一个,装着所有状态)
+├── session "blog"                ← ≈ 一个项目的工作区
+│   ├── window 0 "code"           ← ≈ 项目里的一个任务(显示在底部状态栏)
+│   │   ├── pane: claude          ← window 内的分屏格子
+│   │   └── pane: vim
+│   └── window 1 "logs"
+│       └── pane: tail -f
+└── session "shop"                ← 另一个项目,被 tab[shop] attach
+    └── window 0 "dev"
+```
+
+五个概念对照:
+
+| 概念 | 属于 | 类比 | 怎么创建 |
+|------|------|------|----------|
+| window | Ghostty | 一台显示器 | `Cmd+N` |
+| tab | Ghostty | 显示器上的一个"频道",通常对着一个 session | `Cmd+T` |
+| session | tmux | 一个项目的整个工作区 | `tmux new -s 名字` |
+| window | tmux | 项目里的一个任务页签(底部状态栏可见) | `前缀+c` |
+| pane | tmux | 任务画面里的分屏格子 | `前缀+\|` / `前缀+-` |
+
+生命周期一句话:关 tab 或 quit Ghostty,**只是断开显示**,session 在后台照跑,
+`tmux-restore` 随时接回;重启电脑连 server 也没了,但 continuum 每 5 分钟的
+存档能恢复布局(见下文)。概念详解见 `docs/02-tmux-concepts.zh.md`。
+
 ## 接回 tmux session(`tmux-restore`)
 
 quit Ghostty 后 tmux server 和所有 session 都还活着,消失的只是 Ghostty 的

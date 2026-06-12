@@ -71,6 +71,59 @@ and clones tpm. Existing files are auto-backed-up as `*.bak.<timestamp>`.
 3. **Verify persistence**: `Ctrl+b` then `Ctrl-s` to save once; restart tmux and
    the layout + each pane's cwd should auto-restore.
 
+## Background: how Ghostty and tmux concepts fit together
+
+The most confusing part: **Ghostty and tmux each have their own "window" —
+and they are completely different things**. One-line analogy: **Ghostty is
+the monitor, tmux is the computer**. Unplug the monitor (quit Ghostty) and
+everything inside the computer (sessions) keeps running; plug it back in
+(`tmux-restore`) and the picture comes back.
+
+**Top layer — Ghostty, the "display" (GUI app, gone on Cmd+Q):**
+
+```text
+┌─ Ghostty window (macOS window, Cmd+N) ──────────┐
+│  tab bar (Cmd+T):   [ blog ]   [ shop ]          │
+│ ┌─────────────────────────────────────────────────┐
+│ │                                                 │
+│ │   the active tab's content area = whatever      │
+│ │   the tmux session it is attached to shows      │
+│ │                                                 │
+│ └─────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────┘
+        │ tab[blog] attaches         │ tab[shop] attaches
+        ▼                            ▼
+```
+
+**Bottom layer — tmux, the "state" (background process, survives quit):**
+
+```text
+tmux server (exactly one per machine, holds ALL the state)
+├── session "blog"                ← ≈ one project's workspace
+│   ├── window 0 "code"           ← ≈ one task (shown in the status bar)
+│   │   ├── pane: claude          ← splits inside a window
+│   │   └── pane: vim
+│   └── window 1 "logs"
+│       └── pane: tail -f
+└── session "shop"                ← another project, attached by tab[shop]
+    └── window 0 "dev"
+```
+
+The five concepts side by side:
+
+| Concept | Belongs to | Analogy | Created with |
+|---------|-----------|---------|--------------|
+| window | Ghostty | a monitor | `Cmd+N` |
+| tab | Ghostty | a "channel" on the monitor, usually viewing one session | `Cmd+T` |
+| session | tmux | a project's whole workspace | `tmux new -s name` |
+| window | tmux | one task inside the project (visible in the status bar) | `prefix+c` |
+| pane | tmux | a split inside the task's screen | `prefix+\|` / `prefix+-` |
+
+Lifecycle in one line: closing a tab or quitting Ghostty **only disconnects
+the display** — sessions keep running and `tmux-restore` reattaches them
+anytime; a reboot kills the server too, but continuum's 5-minute autosaves
+restore the layout (see below). Full concept guide: `docs/02-tmux-concepts.en.md`.
+
 ## Reattaching tmux sessions (`tmux-restore`)
 
 Quitting Ghostty leaves the tmux server and all sessions alive — only the
