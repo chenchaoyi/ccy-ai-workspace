@@ -236,7 +236,7 @@ offer_brew_upgrade() {  # <brew upgrade args...>
 # (so non-interactive runs never silently opt into side effects).
 # 是非询问:--yes 自动确认;否则仅在交互终端询问;默认【否】
 # (非交互运行绝不悄悄开启有副作用的动作)。
-confirm() {  # confirm <en-prompt> <zh-prompt> -> 0 if yes
+confirm() {  # confirm <en-prompt> <zh-prompt> -> 0 if yes (default NO)
   if [ "$ASSUME_YES" = 1 ]; then return 0; fi
   if [ -t 0 ]; then
     sayn "$1" "$2"
@@ -244,6 +244,19 @@ confirm() {  # confirm <en-prompt> <zh-prompt> -> 0 if yes
     case "$_ans" in y|Y|yes|YES) return 0;; *) return 1;; esac
   fi
   return 1
+}
+
+# Like confirm() but defaults to YES on an empty answer (Enter = yes). Use for
+# steps that are part of a feature the user already opted into.
+# 同 confirm(),但回车=是(默认 YES)。用于用户已选定功能内部的步骤。
+confirm_yes() {  # confirm_yes <en-prompt> <zh-prompt> -> 0 unless explicitly declined
+  if [ "$ASSUME_YES" = 1 ]; then return 0; fi
+  if [ -t 0 ]; then
+    sayn "$1" "$2"
+    IFS= read -r _ans || _ans="y"
+    case "$_ans" in n|N|no|NO) return 1;; *) return 0;; esac
+  fi
+  return 0
 }
 
 say "== preflight ==" "== 预检 =="
@@ -472,16 +485,26 @@ elif confirm "Enable 'agent finished' desktop notifications? [y/N] " \
   if command -v terminal-notifier >/dev/null 2>&1; then
     say "✓ terminal-notifier found — notifications will be native & clickable" \
         "✓ 已找到 terminal-notifier —— 通知将是原生且可点击"
-  else
-    say "ℹ Without terminal-notifier you'll get a reliable but NON-clickable banner." \
-        "ℹ 没有 terminal-notifier 时通知可靠但【不可点击】。"
-    if command -v brew >/dev/null 2>&1 && \
-       confirm "  Install terminal-notifier now for click-through? [y/N] " \
-               "  现在装 terminal-notifier 以支持点击直达吗?[y/N] "; then
+  elif command -v brew >/dev/null 2>&1; then
+    # Click-through is the point of this feature, so default to installing it
+    # (Enter = yes). Decline with 'n' to keep the non-clickable native banner.
+    # 点击直达是这功能的核心,所以默认装(回车=是)。按 n 则保留不可点击的原生通知。
+    say "ℹ terminal-notifier makes the notification clickable (click → jump to tab)." \
+        "ℹ terminal-notifier 让通知可点击(点击→跳到对应 tab)。"
+    if confirm_yes "  Install it now via Homebrew? [Y/n] " \
+                   "  现在用 Homebrew 装上吗?[Y/n] "; then
       brew install terminal-notifier \
+        && say "✓ terminal-notifier installed — notifications will be clickable" \
+               "✓ 已装 terminal-notifier —— 通知将可点击" \
         || say "  ⚠ install failed — notifications still work (not clickable)" \
                "  ⚠ 安装失败 —— 通知仍可用(不可点击)"
+    else
+      say "  skipped — notifications will work but not be clickable (later: brew install terminal-notifier)" \
+          "  已跳过 —— 通知可用但不可点击(稍后可: brew install terminal-notifier)"
     fi
+  else
+    say "ℹ No Homebrew found — notifications will work but NOT be clickable (later: brew install terminal-notifier)" \
+        "ℹ 未找到 Homebrew —— 通知可用但【不可点击】(稍后可: brew install terminal-notifier)"
   fi
 
   # 7c) Register the hook in settings.json (backed up; idempotent; preserves others)

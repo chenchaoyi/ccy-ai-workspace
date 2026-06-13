@@ -223,10 +223,11 @@ has no tab to surface. `claude-notify` (a Claude Code hook installed by
   session — including ones you aren't looking at — and **stays silent when
   you're already watching that session's Ghostty tab**.
 - With **`terminal-notifier`** the notification is **clickable — the click runs
-  `gtmux focus <session>`** and lands you on the right tab. The installer offers
-  to `brew install` it. Without it you still get a reliable native banner, just
-  not clickable (macOS has no zero-dependency clickable notification); it puts
-  the session name in the text so you can `gtmux focus <name>` yourself.
+  `gtmux focus <session>`** and lands you on the right tab. The installer
+  `brew install`s it for you by default (Enter to accept; decline to skip).
+  Without it you still get a reliable native banner, just not clickable (macOS
+  has no zero-dependency clickable notification); it puts the session name in
+  the text so you can `gtmux focus <name>` yourself.
 - Self-contained — no plugin dependency. If peon-ping is present, the installer
   offers to silence peon's own desktop notifications (and `terminal_tab_title`)
   so you don't get double banners or a title fight with `set-titles`.
