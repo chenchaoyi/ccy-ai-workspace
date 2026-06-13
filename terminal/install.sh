@@ -9,7 +9,7 @@
 # What it does / 做什么:
 #   - Ghostty config      -> ~/.config/ghostty/config
 #   - tmux config         -> ~/.tmux.conf
-#   - tmux-restore CLI    -> ~/.local/bin/tmux-restore
+#   - gtmux CLI           -> ~/.local/bin/gtmux (restore / overview / focus)
 #   - cwd reporter        -> ~/.ghostty-cwd.bash (for macOS bash 3.2)
 #   - tpm + tmux plugins (headless, no prefix+I needed)
 #
@@ -54,7 +54,7 @@ usage() {
 用法: bash terminal/install.sh [选项]
 
 一键安装本仓库的终端环境(macOS),全程可回滚:
-Ghostty 配置、tmux 配置、tmux-restore 命令行、目录上报片段、tpm 及插件。
+Ghostty 配置、tmux 配置、gtmux 命令行、目录上报片段、tpm 及插件。
 
 选项:
   --lang=en|zh   输出语言(默认 en)
@@ -76,7 +76,7 @@ EOF
 Usage: bash terminal/install.sh [OPTIONS]
 
 One-shot, rollbackable installer for this repo's terminal setup (macOS):
-Ghostty config, tmux config, tmux-restore CLI, cwd reporter, tpm + plugins.
+Ghostty config, tmux config, gtmux CLI, cwd reporter, tpm + plugins.
 
 Options:
   --lang=en|zh   Output language (default: en)
@@ -189,7 +189,7 @@ install_file() {    # <src> <dst>
 # ---- preflight checks / 预检 -----------------------------------------------
 # Version floors (what actually breaks below them) / 版本下限(低于会坏什么):
 #   tmux    >= 3.3  allow-passthrough — cwd reporting & OSC through tmux
-#   Ghostty >= 1.3  AppleScript dictionary — tmux-restore's one-shot mode
+#   Ghostty >= 1.3  AppleScript dictionary — gtmux restore/focus need it
 MIN_TMUX="3.3"
 MIN_GHOSTTY="1.3"
 
@@ -277,8 +277,8 @@ if [ -n "$GHOSTTY_VER" ]; then
       offer_brew_upgrade --cask ghostty
     fi
   else
-    say "⚠ Ghostty $GHOSTTY_VER < $MIN_GHOSTTY — tmux-restore's one-shot mode (AppleScript) won't work; --one still does" \
-        "⚠ Ghostty $GHOSTTY_VER 低于 $MIN_GHOSTTY —— tmux-restore 一键模式(AppleScript)不可用,--one 模式不受影响"
+    say "⚠ Ghostty $GHOSTTY_VER < $MIN_GHOSTTY — gtmux restore (one-shot) & focus (AppleScript) won't work; restore --one still does" \
+        "⚠ Ghostty $GHOSTTY_VER 低于 $MIN_GHOSTTY —— gtmux restore 一键模式与 focus(AppleScript)不可用,restore --one 不受影响"
     if command -v brew >/dev/null 2>&1 && brew list --cask ghostty >/dev/null 2>&1; then
       offer_brew_upgrade --cask ghostty
     else
@@ -313,27 +313,28 @@ install_file "$DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
 # Quick-reference shown by the prefix+g popup / 前缀+g 弹窗显示的速查表
 install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
 
-# ---- 3) tmux-restore CLI / tmux-restore 命令行 ------------------------------
-# A standalone, shell-agnostic CLI on PATH (~/.local/bin): run `tmux-restore`
-# from any directory after reopening Ghostty to reattach every tmux session.
-# 安装到 PATH(~/.local/bin)的独立命令行,与 shell 配置无关:重开 Ghostty 后
-# 在任意目录运行 `tmux-restore` 即可一键接回全部 tmux session。
-say "== 3/6 CLI tools (tmux-restore, tmux-overview) ==" "== 3/6 命令行工具(tmux-restore、tmux-overview)=="
-install_file "$DIR/scripts/tmux-restore" "$HOME/.local/bin/tmux-restore"
-chmod +x "$HOME/.local/bin/tmux-restore"
-# Session summary shown by the prefix+g popup; also runnable from any shell
-# 前缀+g 弹窗显示的 session 概览;也可在任意 shell 里直接运行
-install_file "$DIR/scripts/tmux-overview" "$HOME/.local/bin/tmux-overview"
-chmod +x "$HOME/.local/bin/tmux-overview"
-# Legacy home-dir copy from earlier installs: back up and remove
-# 早期版本装在 home 根目录的旧副本:备份后移除
-if [ -f "$HOME/tmux-restore" ]; then
-  bak="$(safe_backup "$HOME/tmux-restore")"
-  record_restore "$HOME/tmux-restore" "$bak"
-  rm -f "$HOME/tmux-restore"
-  say "↪ legacy copy removed: ~/tmux-restore (backup: $bak)" \
-      "↪ 旧位置副本已移除: ~/tmux-restore(备份: $bak)"
-fi
+# ---- 3) gtmux CLI / gtmux 命令行 --------------------------------------------
+# A standalone, shell-agnostic CLI on PATH (~/.local/bin). One command, three
+# verbs: `gtmux restore` (reattach all sessions), `gtmux overview` (the prefix+g
+# popup, also runnable from any shell), `gtmux focus <name>` (jump to a tab).
+# 安装到 PATH(~/.local/bin)的独立命令行,与 shell 配置无关。一个命令三个动词:
+# `gtmux restore`(一键接回全部 session)、`gtmux overview`(前缀+g 弹窗,也可直接跑)、
+# `gtmux focus <名字>`(跳到对应 tab)。
+say "== 3/6 CLI tool (gtmux) ==" "== 3/6 命令行工具(gtmux)=="
+install_file "$DIR/scripts/gtmux" "$HOME/.local/bin/gtmux"
+chmod +x "$HOME/.local/bin/gtmux"
+# Legacy CLIs folded into gtmux: back up and remove the old standalone names
+# (~/.local/bin/tmux-restore, ~/.local/bin/tmux-overview, ~/tmux-restore).
+# 旧的两个独立命令行已并入 gtmux:备份后移除旧名字。
+for legacy in "$HOME/.local/bin/tmux-restore" "$HOME/.local/bin/tmux-overview" "$HOME/tmux-restore"; do
+  if [ -f "$legacy" ]; then
+    bak="$(safe_backup "$legacy")"
+    record_restore "$legacy" "$bak"
+    rm -f "$legacy"
+    say "↪ legacy CLI removed: $legacy → now 'gtmux' (backup: $bak)" \
+        "↪ 旧命令行已移除: $legacy → 改用 'gtmux'(备份: $bak)"
+  fi
+done
 # PATH sanity check — ~/.local/bin is the XDG-standard user-bin dir, but macOS
 # does not put it on PATH by default; give a shell-specific one-liner.
 # PATH 检查 —— ~/.local/bin 是 XDG 标准的用户可执行目录,但 macOS 默认不在
@@ -443,16 +444,16 @@ if [ "$UI_LANG" = zh ]; then
   3) 验证持久化:前缀 + Ctrl-s 手动存一次
   注意:在 repo 里改了配置后,需重跑本脚本才生效。
 
-接回 tmux session:
-  重开 Ghostty 后,在任意 tab、任意目录下运行【一次】:
-      tmux-restore
-  它会为每个 tmux session 开一个 Ghostty tab 并全部接回
-  (需 Ghostty 1.3+;首次运行会弹自动化授权,点允许)。
-  其它模式:
-      tmux-restore --pick   (列出并选择接回哪几个)
-      tmux-restore --one    (当前 tab 接回下一个无人连接的)
-      tmux-restore <名字>    (指定 session)
-  电脑【重启】后(tmux server 已不在)同样适用:会启动 tmux 并由 continuum
+gtmux —— 一个命令管 Ghostty↔tmux 工作区(三个动词):
+  gtmux overview          看现状:session/window/pane 汇总(等同前缀+g 弹窗)
+  gtmux focus <名字>       跳转:把显示该 session 的 Ghostty tab 拉到最前
+  gtmux restore           接回:重开 Ghostty 后,在任意 tab、任意目录运行【一次】,
+                          为每个 session 开一个 tab 并全部接回(需 Ghostty 1.3+;
+                          首次弹自动化授权,点允许)。其它模式:
+      gtmux restore --pick   (列出并选择接回哪几个)
+      gtmux restore --one    (当前 tab 接回下一个无人连接的)
+      gtmux restore <名字>    (指定 session)
+  电脑【重启】后(tmux server 已不在)restore 同样适用:会启动 tmux 并由 continuum
   恢复最近的自动存档(每 5 分钟一次;目录和屏幕文本会回来,运行中的程序不会)。
 
 新窗口继承工作目录:
@@ -475,18 +476,19 @@ Next steps:
   3) Verify persistence: prefix + Ctrl-s to save once
   Note: repo edits are NOT live until you re-run this script.
 
-Reattaching tmux sessions:
-  After reopening Ghostty, run ONCE in any tab, from any directory:
-      tmux-restore
-  It opens one Ghostty tab per tmux session and attaches them all
-  (needs Ghostty 1.3+; first run asks for Automation permission — Allow it).
-  Other modes:
-      tmux-restore --pick   (list sessions, choose which)
-      tmux-restore --one    (attach the next unattached session here)
-      tmux-restore <name>   (a specific session)
-  After a machine REBOOT (tmux server gone) the same commands still work:
-  they start tmux and tmux-continuum restores the last autosave (every 5 min;
-  dirs + screen text come back, running programs are not restarted).
+gtmux — one command for the Ghostty↔tmux workspace (three verbs):
+  gtmux overview          SEE: sessions/windows/panes summary (= the prefix+g popup)
+  gtmux focus <name>      JUMP: bring the Ghostty tab showing that session to front
+  gtmux restore           BUILD: after reopening Ghostty, run ONCE in any tab, from
+                          any directory — opens one tab per session and attaches all
+                          (needs Ghostty 1.3+; first run asks for Automation
+                          permission — Allow it). Other modes:
+      gtmux restore --pick   (list sessions, choose which)
+      gtmux restore --one    (attach the next unattached session here)
+      gtmux restore <name>   (a specific session)
+  After a machine REBOOT (tmux server gone) `gtmux restore` still works: it starts
+  tmux and tmux-continuum restores the last autosave (every 5 min; dirs + screen
+  text come back, running programs are not restarted).
 
 Working-directory inheritance:
   zsh / fish: works out of the box (Ghostty auto-injects shell integration).

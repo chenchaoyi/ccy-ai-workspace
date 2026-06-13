@@ -20,8 +20,8 @@ terminal/
 │   ├── tmux.conf        tmux config (keeps default Ctrl+b prefix)
 │   └── cheatsheet.txt   quick reference shown by the prefix+g popup
 ├── scripts/
-│   ├── tmux-restore     restore the Ghostty ↔ tmux workspace (reattach all sessions)
-│   └── tmux-overview    session/window/pane summary (prefix+g popup, or run anywhere)
+│   └── gtmux            one CLI for the Ghostty↔tmux workspace:
+│                          restore (reattach all) · overview (prefix+g popup) · focus (jump to a tab)
 ├── shell/
 │   └── ghostty-cwd.bash cwd reporting for macOS bash 3.2 (new windows inherit cwd)
 └── docs/
@@ -53,7 +53,7 @@ including output markers and exit codes.
 The script **copies** configs to:
 - `~/.config/ghostty/config`
 - `~/.tmux.conf`
-- `~/.local/bin/tmux-restore` (CLI, callable from any directory — see below;
+- `~/.local/bin/gtmux` (CLI, callable from any directory — see below;
   deliberately NOT wired into any shell rc file, works regardless of your shell)
 - `~/.ghostty-cwd.bash` (only needed by bash users — see "Working-directory
   inheritance" below)
@@ -77,7 +77,7 @@ The most confusing part: **Ghostty and tmux each have their own "window" —
 and they are completely different things**. One-line analogy: **Ghostty is
 the monitor, tmux is the computer**. Unplug the monitor (quit Ghostty) and
 everything inside the computer (sessions) keeps running; plug it back in
-(`tmux-restore`) and the picture comes back.
+(`gtmux restore`) and the picture comes back.
 
 **Top layer — Ghostty, the "display" (GUI app, gone on Cmd+Q):**
 
@@ -120,7 +120,7 @@ The five concepts side by side:
 | pane | tmux | a split inside the task's screen | `prefix+\|` / `prefix+-` |
 
 Lifecycle in one line: closing a tab or quitting Ghostty **only disconnects
-the display** — sessions keep running and `tmux-restore` reattaches them
+the display** — sessions keep running and `gtmux restore` reattaches them
 anytime; a reboot kills the server too, but continuum's 5-minute autosaves
 restore the layout (see below). Full concept guide: `docs/02-tmux-concepts.en.md`.
 
@@ -128,43 +128,50 @@ Corollary: **names belong in the state layer too.** Ghostty tab titles are
 configured to mirror "session — window" automatically (tmux `set-titles`),
 so they come back correct after a reattach; don't rename Ghostty tabs by hand
 (it gets overridden, and is lost on quit anyway) — rename the session
-(`tmux rename-session`) or window (`prefix+,`) instead.
+(`tmux rename-session`) or window (`prefix+,`) instead. This name-on-the-tab
+binding is also what lets `gtmux focus <session>` jump straight to a tab — the
+write side (`set-titles`) and the read side (`focus`) are one feature.
 
-## Reattaching tmux sessions (`tmux-restore`)
+## The `gtmux` CLI — one command for the Ghostty↔tmux workspace
+
+`gtmux` drives Ghostty from the tmux state layer. One command, three verbs —
+**`restore`** (build tabs), **`overview`** (see state), **`focus`** (jump to a
+tab) — covering a tab's whole life. It's a plain executable invoked explicitly
+(no bashrc/zshrc hooks), so it works with any shell. Run bare `gtmux` for the
+overview.
+
+### `gtmux restore` — reattach sessions to tabs
 
 Quitting Ghostty leaves the tmux server and all sessions alive — only the
 Ghostty tabs are gone. After reopening Ghostty, run **once** in any tab:
 
 ```bash
-tmux-restore             # one tab per tmux session, all attached
+gtmux restore            # one Ghostty tab per tmux session, all attached
 ```
 
-It opens one Ghostty tab per session (via Ghostty 1.3+'s native AppleScript
-support) and attaches them all; the tab you ran it in takes the first session.
-Leftover blank tabs restored by `window-save-state` can just be closed (Cmd+W).
-The first run pops an Automation permission dialog ("wants to control
-Ghostty") — click Allow. Tabs are created in session-name order; the original
-tab↔session arrangement isn't recorded anywhere, so it can't be reproduced
-exactly. Per-tab fallback:
+It opens one tab per session (via Ghostty 1.3+'s native AppleScript support)
+and attaches them all; the tab you ran it in takes the first session. Leftover
+blank tabs restored by `window-save-state` can just be closed (Cmd+W). The
+first run pops an Automation permission dialog ("wants to control Ghostty") —
+click Allow. Tabs are created in session-name order; the original tab↔session
+arrangement isn't recorded anywhere, so it can't be reproduced exactly. Per-tab
+fallback:
 
 ```bash
-tmux-restore --pick      # list all sessions (with windows & status), then
-                         # choose which to restore: numbers ("1 3" or "1,3"),
+gtmux restore --pick     # list all sessions (with windows & status), then
+                         # choose which: numbers ("1 3" or "1,3"),
                          # Enter = all detached, q = cancel
-tmux-restore --one       # attach the next unattached session here
-tmux-restore <name>      # or attach a specific session by name
+gtmux restore --one      # attach the next unattached session here
+gtmux restore <name>     # or attach a specific session by name
 ```
 
-It's a plain executable invoked explicitly — no bashrc/zshrc hooks, so it works
-with any shell.
+**After a machine reboot** the tmux server itself is gone. `gtmux restore`
+still works: it starts tmux and waits for tmux-continuum to restore the last
+autosave (every 5 min) — sessions, windows, per-pane directories and on-screen
+text. **Running programs are not restarted**; each pane comes back as a shell
+in its old directory (e.g. restart Claude Code with `claude --resume`).
 
-**After a machine reboot** the tmux server itself is gone. The same commands
-still work: the script starts tmux and waits for tmux-continuum to restore the
-last autosave (every 5 min) — sessions, windows, per-pane directories and
-on-screen text. **Running programs are not restarted**; each pane comes back as
-a shell in its old directory (e.g. restart Claude Code with `claude --resume`).
-
-## Live session overview (`prefix+g`, or `tmux-overview`)
+### `gtmux overview` — see what's running (also `prefix+g`)
 
 Press **`prefix + g`** anywhere — even while a full-screen program (Claude
 Code, vim, …) is running — and a size-fitted popup floats over it without
@@ -180,12 +187,28 @@ tmux overview — 2 sessions · 3 windows · 5 panes
     0: wifiscope  (1 pane)
     1: claude code *  (3 panes)
 
-▶ current  ● attached  ○ detached   * active  Z zoomed  • new output
+▶ current  ● attached  ○ detached   * active  Z zoomed  • new output   (jump: gtmux focus <name>)
 ```
 
 This works because tmux intercepts the prefix before the foreground program
-sees it. The same summary is available as a CLI from any shell:
-`tmux-overview`. The key cheatsheet lives next door on **`prefix + G`**.
+sees it. The same summary is available from any shell: `gtmux overview` (or
+just `gtmux`). The key cheatsheet lives next door on **`prefix + G`**.
+
+### `gtmux focus <name>` — jump to a session's tab
+
+```bash
+gtmux focus shop         # bring the Ghostty tab showing session "shop" to front
+```
+
+This is the read side of `set-titles`: because each tab title is
+"session — window", `focus` finds the tab whose title matches `<name>` and
+runs Ghostty's AppleScript `select tab` + `activate`. Handy on its own ("jump
+to that project"), and it's the hook a desktop-notification click can call to
+land you on the right tab when a background agent finishes.
+
+> Needs `set-titles` to stay authoritative over tab titles. If another tool
+> writes the tab title too (e.g. peon-ping's `terminal_tab_title`), turn that
+> off so titles stay in the "session — window" format `focus` matches on.
 
 ## Working-directory inheritance (new windows/tabs keep your cwd)
 
@@ -211,8 +234,9 @@ Ghostty sees the real directory even when you live in tmux.
 | Prefix key | **Ctrl+b**, plus **Cmd+B** in Ghostty (sends `\x02`) | comfier to press; tmux untouched, Ctrl+b still works over ssh |
 | Pane switching | **vi-style h/j/k/l** (arrows also work) | vim muscle memory |
 | Persistence | tmux + resurrect + continuum | restore session/window/cwd across restarts |
-| Tab naming | name sessions/windows in tmux; **`set-titles` mirrors them onto Ghostty tabs** | titles live in the state layer — survive quit/reboot, auto-correct after `tmux-restore`, zero manual renaming |
-| What's running? | **prefix+g** session overview popup (also `tmux-overview` in any shell) | counts + per-session windows/panes at a glance |
+| Tab naming | name sessions/windows in tmux; **`set-titles` mirrors them onto Ghostty tabs** | titles live in the state layer — survive quit/reboot, auto-correct after `gtmux restore`, zero manual renaming |
+| Workspace CLI | **one `gtmux`**: `restore` (reattach) · `overview` (prefix+g popup) · `focus <name>` (jump to a tab) | one command, three verbs; `focus` reads the `set-titles` titles to land on the right tab |
+| What's running? | **prefix+g** session overview popup (also `gtmux overview` in any shell) | counts + per-session windows/panes at a glance |
 | Forgot a key? | **prefix+G** cheatsheet popup; prefix+? full list; prefix+/ then a key explains it | look it up without leaving tmux |
 | Parallel agents | one session per project, tasks per window | see docs/04 |
 

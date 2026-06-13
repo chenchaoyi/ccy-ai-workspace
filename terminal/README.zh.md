@@ -19,8 +19,8 @@ terminal/
 │   ├── tmux.conf        tmux 配置(保留默认 Ctrl+b 前缀)
 │   └── cheatsheet.txt   前缀+g 弹窗显示的命令速查表
 ├── scripts/
-│   ├── tmux-restore     恢复 Ghostty ↔ tmux 工作现场(一键接回全部 session)
-│   └── tmux-overview    session/window/pane 汇总(前缀+g 弹窗,或任意 shell 运行)
+│   └── gtmux            Ghostty↔tmux 工作区的统一命令行:
+│                          restore(一键接回)· overview(前缀+g 弹窗)· focus(跳到对应 tab)
 ├── shell/
 │   └── ghostty-cwd.bash macOS bash 3.2 的目录上报(让新窗口继承工作目录)
 └── docs/
@@ -51,7 +51,7 @@ bash terminal/install.sh              # English output(默认)
 脚本会**拷贝**配置到:
 - `~/.config/ghostty/config`
 - `~/.tmux.conf`
-- `~/.local/bin/tmux-restore`(命令行工具,任意目录可调用,见下文 ——
+- `~/.local/bin/gtmux`(命令行工具,任意目录可调用,见下文 ——
   刻意【不】写进任何 shell 的 rc 文件,所以无论你用 bash/zsh/fish 都能用)
 - `~/.ghostty-cwd.bash`(仅 bash 用户需要 —— 见下文"新窗口继承工作目录")
 
@@ -70,7 +70,7 @@ bash terminal/install.sh              # English output(默认)
 
 最容易混淆的点:**Ghostty 和 tmux 各有自己的 "window",但完全是两回事**。
 一句话类比:**Ghostty 是显示器,tmux 是主机**。拔掉显示器(quit Ghostty),
-主机里的东西(session)照样跑;重新接上(`tmux-restore`)画面就回来了。
+主机里的东西(session)照样跑;重新接上(`gtmux restore`)画面就回来了。
 
 **上层 —— Ghostty,负责"显示"(GUI 程序,Cmd+Q 就没了):**
 
@@ -113,21 +113,30 @@ tmux server(整台机器只有一个,装着所有状态)
 | pane | tmux | 任务画面里的分屏格子 | `前缀+\|` / `前缀+-` |
 
 生命周期一句话:关 tab 或 quit Ghostty,**只是断开显示**,session 在后台照跑,
-`tmux-restore` 随时接回;重启电脑连 server 也没了,但 continuum 每 5 分钟的
+`gtmux restore` 随时接回;重启电脑连 server 也没了,但 continuum 每 5 分钟的
 存档能恢复布局(见下文)。概念详解见 `docs/02-tmux-concepts.zh.md`。
 
 推论:**命名也要写在状态层**。Ghostty tab 标题已配置为自动显示
 "session 名 — window 名"(tmux `set-titles`),接回后名字自动正确;
 不要手动给 Ghostty tab 改名(会被覆盖,且 quit 后必丢),
 要改名就改 session(`tmux rename-session`)或 window(`前缀+,`)。
+这个"名字写在 tab 上"的绑定,也正是 `gtmux focus <session>` 能直接跳到对应
+tab 的原因 —— 写的一侧(`set-titles`)和读的一侧(`focus`)是同一套能力。
 
-## 接回 tmux session(`tmux-restore`)
+## `gtmux` 命令行 —— 一个命令管 Ghostty↔tmux 工作区
+
+`gtmux` 用 tmux 状态层驱动 Ghostty。一个命令,三个动词 —— **`restore`**(建 tab)、
+**`overview`**(看现状)、**`focus`**(跳到 tab)—— 覆盖一个 tab 的完整生命周期。
+它是个显式调用的普通可执行脚本(不碰 bashrc/zshrc),换什么 shell 都能用。
+不带参数直接敲 `gtmux` 就是看概览。
+
+### `gtmux restore` —— 把 session 接回成 tab
 
 quit Ghostty 后 tmux server 和所有 session 都还活着,消失的只是 Ghostty 的
 tab。重开 Ghostty 后,在任意 tab 里运行**一次**:
 
 ```bash
-tmux-restore             # 每个 session 一个 tab,一次全部接回
+gtmux restore            # 每个 session 一个 tab,一次全部接回
 ```
 
 它通过 Ghostty 1.3+ 的原生 AppleScript 能力,为每个 session 开一个 tab 并全部
@@ -138,21 +147,19 @@ Ghostty"),点允许即可。tab 按 session 名字顺序创建 —— 原来"哪
 也可以在单个 tab 里逐个接:
 
 ```bash
-tmux-restore --pick      # 列出所有 session(含 window 和连接状态),自己选:
+gtmux restore --pick     # 列出所有 session(含 window 和连接状态),自己选:
                          # 输编号("1 3" 或 "1,3"),回车=全部待接回,q=取消
-tmux-restore --one       # 当前 tab 接回下一个无人连接的 session
-tmux-restore <名字>       # 或按名字 attach 指定 session
+gtmux restore --one      # 当前 tab 接回下一个无人连接的 session
+gtmux restore <名字>      # 或按名字 attach 指定 session
 ```
 
-它是个显式调用的普通可执行脚本 —— 不碰 bashrc/zshrc,换什么 shell 都能用。
-
-**电脑意外重启后** tmux server 本身也没了,同样的命令依然适用:脚本会启动
+**电脑意外重启后** tmux server 本身也没了,`gtmux restore` 依然适用:它会启动
 tmux 并等 tmux-continuum 恢复最近一次自动存档(每 5 分钟存一次)——
 session/window 结构、各 pane 的目录和屏幕文本都会回来。**正在运行的程序不会
 自动重启**,每个 pane 恢复成停在原目录的 shell(比如 Claude Code 用
 `claude --resume` 重新拉起)。
 
-## session 实时概览(`前缀+g`,或 `tmux-overview`)
+### `gtmux overview` —— 看现在跑着什么(也是 `前缀+g`)
 
 在任何地方按 **`前缀 + g`** —— 包括 Claude Code、vim 等全屏程序正在运行时 ——
 一个按内容自适应大小的弹窗会悬浮在上方,完全不打断当前工作,按任意键关闭:
@@ -167,12 +174,27 @@ tmux overview — 2 sessions · 3 windows · 5 panes
     0: wifiscope  (1 pane)
     1: claude code *  (3 panes)
 
-▶ 当前  ● 已连接  ○ 待接回   * 活跃  Z 放大  • 新输出
+▶ 当前  ● 已连接  ○ 待接回   * 活跃  Z 放大  • 新输出   (跳转: gtmux focus <名字>)
 ```
 
 原理:前缀键由 tmux 拦截,轮不到 pane 里的前台程序,所以全屏 agent 跑着也能
-随时呼出。同样的汇总在任意 shell 里可用 CLI 查看:`tmux-overview`。
+随时呼出。同样的汇总在任意 shell 里可用 CLI 查看:`gtmux overview`(或直接 `gtmux`)。
 命令速查表在隔壁:**`前缀 + G`**。
+
+### `gtmux focus <名字>` —— 跳到某个 session 的 tab
+
+```bash
+gtmux focus shop         # 把显示 session "shop" 的 Ghostty tab 拉到最前
+```
+
+这是 `set-titles` 的【读】侧:因为每个 tab 标题都是 "session — window",
+`focus` 找到标题匹配 `<名字>` 的那个 tab,调用 Ghostty 的 AppleScript
+`select tab` + `activate`。它本身就好用("跳到那个项目"),也是桌面通知
+点击后跳到正确 tab 的那个钩子 —— 后台 agent 干完活,一点通知就落到它的 tab 上。
+
+> 前提是 `set-titles` 独占 tab 标题。如果还有别的工具也在写 tab 标题
+> (比如 peon-ping 的 `terminal_tab_title`),把那个关掉,标题才会保持
+> `focus` 匹配所依赖的 "session — window" 格式。
 
 ## 新窗口继承工作目录
 
@@ -196,8 +218,9 @@ tmux.conf 已开 `allow-passthrough on`),常驻 tmux 时 Ghostty 也能拿到真
 | 前缀键 | **Ctrl+b**,Ghostty 里另配 **Cmd+B**(发送 `\x02`) | 按起来更舒服;tmux 零改动,ssh 下 Ctrl+b 照常可用 |
 | pane 切换 | **vi 风格 h/j/k/l**(方向键也可) | 习惯 vim 手感 |
 | 持久化 | tmux + resurrect + continuum | 跨重启恢复 session/window/cwd,比快照工具更彻底 |
-| tab 命名 | 名字起在 tmux 的 session/window 上,**`set-titles` 自动映射到 Ghostty tab 标题** | 名字活在状态层 —— quit/重启不丢,`tmux-restore` 接回后自动正确,零手动命名 |
-| 现在跑着什么? | **前缀+g** session 概览弹窗(shell 里也可 `tmux-overview`) | 一眼看清 session/window/pane 数量与明细 |
+| tab 命名 | 名字起在 tmux 的 session/window 上,**`set-titles` 自动映射到 Ghostty tab 标题** | 名字活在状态层 —— quit/重启不丢,`gtmux restore` 接回后自动正确,零手动命名 |
+| 工作区命令行 | **一个 `gtmux`**:`restore`(接回)·`overview`(前缀+g 弹窗)·`focus <名字>`(跳到 tab) | 一个命令三个动词;`focus` 读 `set-titles` 写的标题精确落到对应 tab |
+| 现在跑着什么? | **前缀+g** session 概览弹窗(shell 里也可 `gtmux overview`) | 一眼看清 session/window/pane 数量与明细 |
 | 忘了按键? | **前缀+G** 速查表弹窗;前缀+? 全量键位;前缀+/ 再按某键=解释它 | 不离开 tmux 随手查 |
 | 并行 agent | 一项目一 session,任务分 window | 见 docs/04 |
 

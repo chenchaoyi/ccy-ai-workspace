@@ -31,8 +31,10 @@
   g          session 概览弹窗(数量 + window/pane 汇总)
   $          重命名当前 session
   ───────── 以下在 shell 里输,不用前缀 ─────────
-  tmux-restore          一键接回全部 session(每个一个 Ghostty tab)
-  tmux-restore --pick   列出 session 自己选
+  gtmux restore         一键接回全部 session(每个一个 Ghostty tab)
+  gtmux restore --pick  列出 session 自己选
+  gtmux focus 名字       跳到显示该 session 的 Ghostty tab
+  gtmux overview        session/window/pane 汇总(= 前缀 g 弹窗)
   tmux new -s 名字       新建命名 session
 
 ── 复制模式(翻滚动历史 / 选文本)──────────────────────────────────────
