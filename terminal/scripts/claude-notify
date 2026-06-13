@@ -93,19 +93,29 @@ log_dbg "decision=NOTIFY (front_sel_match=$front_sel_match)"
 NERR=/dev/null
 [ -f "$HOME/.claude/.claude-notify-debug" ] && NERR="$HOME/.claude/claude-notify.log"
 if command -v terminal-notifier >/dev/null 2>&1; then
-  # Preferred: native + CLICKABLE. -execute runs via /bin/sh -c on click;
+  # Preferred: native + CLICKABLE. Layout: title "Claude Code", subtitle = the
+  # session, message + click-to-open. -execute runs via /bin/sh -c on click;
   # quote the (possibly spaced) session name so `gtmux focus` gets one arg.
-  # 首选:原生 + 可点击。点击时 -execute 经 /bin/sh -c 执行;给(可能带空格的)
-  # session 名加引号,让 `gtmux focus` 收到单个参数。
+  # A Claude icon shows on the right via -contentImage IF cached (install.sh
+  # generates ~/.local/share/gtmux/notify-icon.png from Claude.app). The LEFT
+  # app icon can't be changed (terminal-notifier limitation on modern macOS);
+  # -appIcon is ignored and -sender would break click-to-focus.
+  # 首选:原生 + 可点击。布局:标题 "Claude Code"、副标题 = session、正文 + 点击打开。
+  # 点击时 -execute 经 /bin/sh -c 执行;给(可能带空格的)session 名加引号。右侧 Claude
+  # 小图标用 -contentImage(install.sh 从 Claude.app 生成 ~/.local/share/gtmux/notify-icon.png,
+  # 有才加)。左侧主图标改不了(terminal-notifier 在新版 macOS 的限制;-appIcon 被忽略,
+  # -sender 会毁掉点击跳转)。
   log_dbg "notifier=terminal-notifier (clickable)"
+  ICON="${CLAUDE_NOTIFY_ICON:-$HOME/.local/share/gtmux/notify-icon.png}"; [ -f "$ICON" ] || ICON=""
+  tn=(terminal-notifier -title "Claude Code" -sound default)
+  [ -n "$ICON" ] && tn+=(-contentImage "$ICON")
   if [ -n "$SESSION" ]; then
-    nohup terminal-notifier -title "$TITLE" -message "Agent finished — click to open" \
-      -sound default -group "claude-notify-$SESSION" \
-      -execute "$GTMUX focus \"$SESSION\"" </dev/null >/dev/null 2>>"$NERR" &
+    tn+=(-subtitle "$SESSION" -message "Agent finished — click to open" \
+         -group "claude-notify-$SESSION" -execute "$GTMUX focus \"$SESSION\"")
   else
-    nohup terminal-notifier -title "Claude Code" -message "Agent finished" \
-      -sound default </dev/null >/dev/null 2>>"$NERR" &
+    tn+=(-message "Agent finished")
   fi
+  nohup "${tn[@]}" </dev/null >/dev/null 2>>"$NERR" &
 else
   # Fallback: native system banner — reliable, but NOT clickable (macOS has no
   # zero-dependency clickable notification). Put the session in the text so you

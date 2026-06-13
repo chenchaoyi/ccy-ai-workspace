@@ -476,6 +476,19 @@ elif confirm "Enable 'agent finished' desktop notifications? [y/N] " \
   # 7a) Install the hook script
   install_file "$DIR/scripts/claude-notify" "$HOME/.local/bin/claude-notify"
   chmod +x "$HOME/.local/bin/claude-notify"
+  # Cache a Claude icon for the notification's right-side image (best-effort;
+  # terminal-notifier's -contentImage needs a raster file, and the LEFT app icon
+  # can't be overridden on modern macOS). Skipped silently if Claude.app/sips absent.
+  # 为通知右侧小图缓存一张 Claude 图标(尽力而为;-contentImage 需要位图文件,左侧主图标
+  # 在新版 macOS 改不了)。没有 Claude.app 或 sips 就静默跳过。
+  _claude_icns="/Applications/Claude.app/Contents/Resources/electron.icns"
+  if [ -f "$_claude_icns" ] && command -v sips >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/share/gtmux"
+    if sips -s format png -Z 256 "$_claude_icns" --out "$HOME/.local/share/gtmux/notify-icon.png" >/dev/null 2>&1; then
+      record_remove "$HOME/.local/share/gtmux/notify-icon.png"
+      say "✓ cached Claude notification icon" "✓ 已缓存 Claude 通知图标"
+    fi
+  fi
 
   # 7b) Notifier: terminal-notifier makes the notification CLICKABLE (click →
   # gtmux focus). Without it the hook still notifies, just not clickable, so
