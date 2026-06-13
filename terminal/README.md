@@ -20,8 +20,10 @@ terminal/
 │   ├── tmux.conf        tmux config (keeps default Ctrl+b prefix)
 │   └── cheatsheet.txt   quick reference shown by the prefix+g popup
 ├── scripts/
-│   └── gtmux            one CLI for the Ghostty↔tmux workspace:
-│                          restore (reattach all) · overview (prefix+g popup) · focus (jump to a tab)
+│   ├── gtmux            one CLI for the Ghostty↔tmux workspace:
+│   │                      restore (reattach all) · overview (prefix+g popup) · focus (jump to a tab)
+│   ├── claude-notify    Claude Code hook: agent-done desktop notification, click → gtmux focus
+│   └── notify-overlay.js zero-dependency clickable banner (fallback when no terminal-notifier)
 ├── shell/
 │   └── ghostty-cwd.bash cwd reporting for macOS bash 3.2 (new windows inherit cwd)
 └── docs/
@@ -210,6 +212,28 @@ land you on the right tab when a background agent finishes.
 > writes the tab title too (e.g. peon-ping's `terminal_tab_title`), turn that
 > off so titles stay in the "session — window" format `focus` matches on.
 
+## Agent-done notifications that click through to the tab (Claude Code)
+
+Without tmux, Ghostty shows a native notification when a Claude Code agent
+finishes and clicking it jumps to that tab. **Under tmux that path is dead** —
+tmux drops the bare notification escape, and a backgrounded/detached session
+has no tab to surface. `claude-notify` (a Claude Code hook installed by
+`install.sh`) restores it, and works whether or not you use peon-ping:
+
+- Fires a desktop notification when an agent finishes in **any** tmux
+  session — including ones you aren't looking at — and **stays silent when
+  you're already watching that session's Ghostty tab**.
+- **Clicking it runs `gtmux focus <session>`**, landing you on the right tab.
+- Picks its notifier automatically: `terminal-notifier` if installed (native,
+  clickable), else a bundled zero-dependency JXA overlay (`notify-overlay.js`).
+- Self-contained — no plugin dependency. If peon-ping is present, the installer
+  offers to silence peon's own desktop notifications (and `terminal_tab_title`)
+  so you don't get double banners or a title fight with `set-titles`.
+
+It's **opt-in**: `install.sh`'s last step asks before enabling it, because
+wiring it edits `~/.claude/settings.json` (backed up, idempotent, your other
+hooks preserved). Run the installer again anytime to turn it on.
+
 ## Working-directory inheritance (new windows/tabs keep your cwd)
 
 Ghostty's `window-inherit-working-directory` needs the shell to **report** its
@@ -237,6 +261,7 @@ Ghostty sees the real directory even when you live in tmux.
 | Tab naming | name sessions/windows in tmux; **`set-titles` mirrors them onto Ghostty tabs** | titles live in the state layer — survive quit/reboot, auto-correct after `gtmux restore`, zero manual renaming |
 | Workspace CLI | **one `gtmux`**: `restore` (reattach) · `overview` (prefix+g popup) · `focus <name>` (jump to a tab) | one command, three verbs; `focus` reads the `set-titles` titles to land on the right tab |
 | What's running? | **prefix+g** session overview popup (also `gtmux overview` in any shell) | counts + per-session windows/panes at a glance |
+| Agent-done alerts | **`claude-notify`** hook: notify on finish, **click → `gtmux focus`** | restores Ghostty's click-through notification that tmux otherwise kills; quiet when you're watching; peon-independent |
 | Forgot a key? | **prefix+G** cheatsheet popup; prefix+? full list; prefix+/ then a key explains it | look it up without leaving tmux |
 | Parallel agents | one session per project, tasks per window | see docs/04 |
 

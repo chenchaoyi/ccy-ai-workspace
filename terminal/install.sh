@@ -232,6 +232,20 @@ offer_brew_upgrade() {  # <brew upgrade args...>
   fi
 }
 
+# Yes/no prompt: --yes auto-confirms; otherwise ask only on a TTY; default NO
+# (so non-interactive runs never silently opt into side effects).
+# 是非询问:--yes 自动确认;否则仅在交互终端询问;默认【否】
+# (非交互运行绝不悄悄开启有副作用的动作)。
+confirm() {  # confirm <en-prompt> <zh-prompt> -> 0 if yes
+  if [ "$ASSUME_YES" = 1 ]; then return 0; fi
+  if [ -t 0 ]; then
+    sayn "$1" "$2"
+    IFS= read -r _ans || _ans=""
+    case "$_ans" in y|Y|yes|YES) return 0;; *) return 1;; esac
+  fi
+  return 1
+}
+
 say "== preflight ==" "== 预检 =="
 
 # tmux: presence + version floor + newer-version offer
@@ -293,7 +307,7 @@ fi
 say "  backups + rollback: $BACKUP_DIR" "  备份与回滚: $BACKUP_DIR"
 
 # ---- 1) Ghostty config / Ghostty 配置 -------------------------------------
-say "== 1/6 Ghostty config ==" "== 1/6 Ghostty 配置 =="
+say "== 1/7 Ghostty config ==" "== 1/7 Ghostty 配置 =="
 install_file "$DIR/ghostty/config" "$HOME/.config/ghostty/config"
 # Legacy non-standard config.ghostty: back it up and disable to avoid double-load
 # 旧的非标准 config.ghostty:备份并停用,避免与新配置重复加载
@@ -308,7 +322,7 @@ if [ -e "$LEGACY" ]; then
 fi
 
 # ---- 2) tmux config + cheatsheet / tmux 配置 + 速查表 -----------------------
-say "== 2/6 tmux config ==" "== 2/6 tmux 配置 =="
+say "== 2/7 tmux config ==" "== 2/7 tmux 配置 =="
 install_file "$DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
 # Quick-reference shown by the prefix+g popup / 前缀+g 弹窗显示的速查表
 install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
@@ -320,7 +334,7 @@ install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
 # 安装到 PATH(~/.local/bin)的独立命令行,与 shell 配置无关。一个命令三个动词:
 # `gtmux restore`(一键接回全部 session)、`gtmux overview`(前缀+g 弹窗,也可直接跑)、
 # `gtmux focus <名字>`(跳到对应 tab)。
-say "== 3/6 CLI tool (gtmux) ==" "== 3/6 命令行工具(gtmux)=="
+say "== 3/7 CLI tool (gtmux) ==" "== 3/7 命令行工具(gtmux)=="
 install_file "$DIR/scripts/gtmux" "$HOME/.local/bin/gtmux"
 chmod +x "$HOME/.local/bin/gtmux"
 # Legacy CLIs folded into gtmux: back up and remove the old standalone names
@@ -358,11 +372,11 @@ esac
 # macOS 自带 /bin/bash(3.2)没有 Ghostty 自动 shell 集成,新窗口/新 tab 无法
 # 继承工作目录。该片段补上最小化 OSC 7 上报(tmux 内同样生效)。bash 用户在
 # .bashrc 里 source 它 —— 见结尾说明。
-say "== 4/6 cwd reporter ==" "== 4/6 目录上报片段 =="
+say "== 4/7 cwd reporter ==" "== 4/7 目录上报片段 =="
 install_file "$DIR/shell/ghostty-cwd.bash" "$HOME/.ghostty-cwd.bash"
 
 # ---- 5) tpm (non-fatal) / tpm(失败不致命)--------------------------------
-say "== 5/6 tpm (tmux plugin manager) ==" "== 5/6 tpm(tmux 插件管理器)=="
+say "== 5/7 tpm (tmux plugin manager) ==" "== 5/7 tpm(tmux 插件管理器)=="
 TPM="$HOME/.tmux/plugins/tpm"
 PLUGINS_DIR="$HOME/.tmux/plugins"
 FRESH_TPM=0
@@ -388,7 +402,7 @@ fi
 # No need to press prefix+I by hand — installed here via an ISOLATED tmux server
 # (-L socket) so your running tmux, if any, is never touched.
 # 不用手动按 前缀+I —— 这里用【独立 socket 的 tmux server】自动装好,绝不碰你正在跑的 tmux。
-say "== 6/6 tmux plugins ==" "== 6/6 tmux 插件 =="
+say "== 6/7 tmux plugins ==" "== 6/7 tmux 插件 =="
 if [ -x "$TPM/bin/install_plugins" ] && command -v tmux >/dev/null 2>&1; then
   NEW_PLUGINS=""
   for p in tmux-resurrect tmux-continuum; do
@@ -427,6 +441,120 @@ fi
 if ! infocmp tmux-256color >/dev/null 2>&1; then
   say "⚠ terminfo 'tmux-256color' not found — colors/keys inside tmux may misbehave (fix: brew install ncurses)" \
       "⚠ 未找到 tmux-256color terminfo —— tmux 内颜色或按键可能异常(修复: brew install ncurses)"
+fi
+
+# ---- 7) Claude Code agent-done notifications (optional) --------------------
+# Click-through desktop notification when an agent finishes in any tmux session,
+# landing you on its Ghostty tab via `gtmux focus`. Self-contained (no plugin
+# dependency); auto-picks terminal-notifier (clickable) or a bundled JXA overlay.
+# Opt-in because it edits ~/.claude/settings.json (a different tool's config).
+# 可点击的"agent 完成"桌面通知:任意 tmux session 里 agent 跑完即弹,点击经
+# `gtmux focus` 跳到它的 Ghostty tab。自包含(不依赖插件);自动选 terminal-notifier
+# (可点击)或自带 JXA 浮层。默认 opt-in,因为它要改 ~/.claude/settings.json(别的工具的配置)。
+say "== 7/7 Claude Code notifications (optional) ==" "== 7/7 Claude Code 完成通知(可选)=="
+CLAUDE_DIR="$HOME/.claude"
+SETTINGS="$CLAUDE_DIR/settings.json"
+if [ ! -d "$CLAUDE_DIR" ]; then
+  say "ℹ Claude Code not detected (~/.claude absent) — skipping notification setup" \
+      "ℹ 未检测到 Claude Code(无 ~/.claude)—— 跳过通知设置"
+elif confirm "Enable click-through 'agent finished' desktop notifications? [y/N] " \
+             "启用可点击的「agent 完成」桌面通知吗?[y/N] "; then
+  # 7a) Install the hook script + the zero-dependency overlay
+  install_file "$DIR/scripts/claude-notify" "$HOME/.local/bin/claude-notify"
+  chmod +x "$HOME/.local/bin/claude-notify"
+  install_file "$DIR/scripts/notify-overlay.js" "$HOME/.local/share/gtmux/notify-overlay.js"
+
+  # 7b) Notifier: overlay always works; terminal-notifier is a nicer native option
+  if command -v terminal-notifier >/dev/null 2>&1; then
+    say "✓ terminal-notifier found — notifications will use it (native, clickable)" \
+        "✓ 已找到 terminal-notifier —— 通知将用它(原生、可点击)"
+  else
+    say "ℹ Using the bundled JXA overlay (zero-dependency, clickable)." \
+        "ℹ 使用自带 JXA 浮层(零依赖、可点击)。"
+    if command -v brew >/dev/null 2>&1 && \
+       confirm "  Also install terminal-notifier for native banners? [y/N] " \
+               "  另外装 terminal-notifier 用原生通知栏吗?[y/N] "; then
+      brew install terminal-notifier \
+        || say "  ⚠ install failed — the overlay still works" \
+               "  ⚠ 安装失败 —— 浮层仍可用"
+    fi
+  fi
+
+  # 7c) Register the hook in settings.json (backed up; idempotent; preserves others)
+  if [ -f "$SETTINGS" ]; then
+    sbak="$(safe_backup "$SETTINGS")"; record_restore "$SETTINGS" "$sbak"
+  else
+    record_remove "$SETTINGS"
+  fi
+  merged="$(python3 - "$SETTINGS" "$HOME/.local/bin/claude-notify" <<'PY'
+import json, sys, os
+path, cmd = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as f: cfg = json.load(f)
+except Exception:
+    cfg = {}
+hooks = cfg.setdefault('hooks', {})
+changed = False
+for event in ('Stop', 'Notification'):
+    groups = hooks.setdefault(event, [])
+    present = any(
+        isinstance(h, dict) and h.get('command') == cmd
+        for g in groups if isinstance(g, dict)
+        for h in (g.get('hooks') or []))
+    if not present:
+        groups.append({'matcher': '', 'hooks': [
+            {'type': 'command', 'command': cmd, 'async': True}]})
+        changed = True
+if changed:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as f: json.dump(cfg, f, indent=2)
+print('changed' if changed else 'nochange')
+PY
+)" || merged="error"
+  case "$merged" in
+    changed)  say "✓ hook registered in settings.json (Stop + Notification)" \
+                  "✓ 已注册到 settings.json(Stop + Notification)";;
+    nochange) say "✓ hook already registered in settings.json" \
+                  "✓ settings.json 中已注册,无需改动";;
+    *)        say "⚠ could not edit settings.json — add claude-notify to Stop/Notification by hand" \
+                  "⚠ 无法编辑 settings.json —— 请手动把 claude-notify 加到 Stop/Notification";;
+  esac
+
+  # 7d) Coexist with peon-ping: avoid double-fire + tab-title conflict with set-titles
+  PEON_CFG="$CLAUDE_DIR/hooks/peon-ping/config.json"
+  if [ -f "$PEON_CFG" ]; then
+    if confirm "Detected peon-ping. Disable its desktop notifications + tab-title to avoid conflicts? [y/N] " \
+               "检测到 peon-ping。关掉它的桌面通知和 tab 标题以免冲突(双弹/抢标题)吗?[y/N] "; then
+      pbak="$(safe_backup "$PEON_CFG")"; record_restore "$PEON_CFG" "$pbak"
+      if python3 - "$PEON_CFG" <<'PY'
+import json, sys
+p = sys.argv[1]
+try:
+    c = json.load(open(p))
+except Exception:
+    c = {}
+c['desktop_notifications'] = False   # we own notifications now
+c['terminal_tab_title']   = False    # set-titles owns the tab title (gtmux focus needs it)
+json.dump(c, open(p, 'w'), indent=2)
+PY
+      then
+        say "✓ peon-ping: desktop_notifications + terminal_tab_title disabled (sounds still on)" \
+            "✓ peon-ping:已关桌面通知与 tab 标题(音效保留)"
+      else
+        say "⚠ could not edit peon-ping config — disable its desktop_notifications by hand" \
+            "⚠ 无法编辑 peon-ping 配置 —— 请手动关掉它的 desktop_notifications"
+      fi
+    else
+      say "ℹ Left peon-ping as-is — you may get double notifications until you disable its desktop_notifications" \
+          "ℹ peon-ping 保持原样 —— 在你关掉它的 desktop_notifications 前可能会双弹"
+    fi
+  fi
+
+  say "→ Reload: restart Claude Code (or run /hooks) so the new hook takes effect." \
+      "→ 生效:重启 Claude Code(或执行 /hooks)让新钩子加载。"
+else
+  say "ℹ Skipped. Re-run this installer anytime to enable agent-done notifications." \
+      "ℹ 已跳过。想启用「agent 完成」通知随时重跑本安装脚本即可。"
 fi
 
 # ---- done / 完成 -----------------------------------------------------------

@@ -19,8 +19,10 @@ terminal/
 │   ├── tmux.conf        tmux 配置(保留默认 Ctrl+b 前缀)
 │   └── cheatsheet.txt   前缀+g 弹窗显示的命令速查表
 ├── scripts/
-│   └── gtmux            Ghostty↔tmux 工作区的统一命令行:
-│                          restore(一键接回)· overview(前缀+g 弹窗)· focus(跳到对应 tab)
+│   ├── gtmux            Ghostty↔tmux 工作区的统一命令行:
+│   │                      restore(一键接回)· overview(前缀+g 弹窗)· focus(跳到对应 tab)
+│   ├── claude-notify    Claude Code 钩子:agent 完成弹通知,点击→ gtmux focus
+│   └── notify-overlay.js 零依赖可点击通知浮层(没装 terminal-notifier 时的兜底)
 ├── shell/
 │   └── ghostty-cwd.bash macOS bash 3.2 的目录上报(让新窗口继承工作目录)
 └── docs/
@@ -196,6 +198,24 @@ gtmux focus shop         # 把显示 session "shop" 的 Ghostty tab 拉到最前
 > (比如 peon-ping 的 `terminal_tab_title`),把那个关掉,标题才会保持
 > `focus` 匹配所依赖的 "session — window" 格式。
 
+## agent 完成通知,点击直达 tab(Claude Code)
+
+不用 tmux 时,Claude Code 的 agent 跑完,Ghostty 会弹原生通知,点一下就跳到那个
+tab。**在 tmux 下这条路是断的** —— tmux 会丢掉那条裸通知转义序列,而且后台/detached
+的 session 根本没有 tab 可呈现。`claude-notify`(由 `install.sh` 安装的 Claude Code
+钩子)把它补回来,**用不用 peon-ping 都能工作**:
+
+- **任意** tmux session 里 agent 完成都会弹桌面通知 —— 包括你没在看的那些 ——
+  并且**你正盯着该 session 的 Ghostty tab 时保持安静**。
+- **点击它会跑 `gtmux focus <session>`**,直接落到对应 tab。
+- 自动选通知器:装了 `terminal-notifier` 就用它(原生、可点击),否则用自带的
+  零依赖 JXA 浮层(`notify-overlay.js`)。
+- 自包含 —— 不依赖任何插件。检测到 peon-ping 时,安装器会**提示你关掉 peon 自己的
+  桌面通知(和 `terminal_tab_title`)**,免得双弹或跟 `set-titles` 抢标题。
+
+它是 **opt-in**:`install.sh` 最后一步会先问你再启用,因为接线要改
+`~/.claude/settings.json`(有备份、幂等、保留你已有的钩子)。想开随时重跑安装器。
+
 ## 新窗口继承工作目录
 
 Ghostty 的 `window-inherit-working-directory` 生效的前提是 shell 主动**上报**
@@ -221,6 +241,7 @@ tmux.conf 已开 `allow-passthrough on`),常驻 tmux 时 Ghostty 也能拿到真
 | tab 命名 | 名字起在 tmux 的 session/window 上,**`set-titles` 自动映射到 Ghostty tab 标题** | 名字活在状态层 —— quit/重启不丢,`gtmux restore` 接回后自动正确,零手动命名 |
 | 工作区命令行 | **一个 `gtmux`**:`restore`(接回)·`overview`(前缀+g 弹窗)·`focus <名字>`(跳到 tab) | 一个命令三个动词;`focus` 读 `set-titles` 写的标题精确落到对应 tab |
 | 现在跑着什么? | **前缀+g** session 概览弹窗(shell 里也可 `gtmux overview`) | 一眼看清 session/window/pane 数量与明细 |
+| agent 完成提醒 | **`claude-notify`** 钩子:完成弹通知,**点击→ `gtmux focus`** | 补回 tmux 下被掐断的"点击直达 tab"通知;在看时不打扰;不依赖 peon |
 | 忘了按键? | **前缀+G** 速查表弹窗;前缀+? 全量键位;前缀+/ 再按某键=解释它 | 不离开 tmux 随手查 |
 | 并行 agent | 一项目一 session,任务分 window | 见 docs/04 |
 
