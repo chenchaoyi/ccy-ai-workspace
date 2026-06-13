@@ -6,13 +6,15 @@
 # 跳到它所在的 Ghostty tab。
 #
 # General & self-contained: does NOT depend on peon-ping or any plugin. Picks a
-# notifier automatically — terminal-notifier if installed (clickable -execute),
-# otherwise a bundled zero-dependency JXA overlay, otherwise a plain (non-click)
-# system banner. Suppresses the notification when you are already looking at
-# that session's Ghostty tab.
-# 通用、自包含:不依赖 peon-ping 或任何插件。自动选通知器 —— 装了
-# terminal-notifier 就用它(点击 -execute),否则用自带的零依赖 JXA 浮层,
-# 再不行退回系统普通通知(不可点)。当你正看着该 session 的 Ghostty tab 时不弹。
+# notifier automatically — terminal-notifier if installed (native + CLICKABLE:
+# the click runs `gtmux focus`), otherwise a native osascript banner that is
+# reliable but NOT clickable (macOS has no zero-dependency clickable
+# notification — install terminal-notifier for click-through). Suppresses the
+# notification when you are already looking at that session's Ghostty tab.
+# 通用、自包含:不依赖 peon-ping 或任何插件。自动选通知器 —— 装了 terminal-notifier
+# 就用它(原生 + 可点击,点击跑 `gtmux focus`);否则用原生 osascript 通知:可靠但
+# 【不可点击】(macOS 没有零依赖的可点击通知,想点击直达就装 terminal-notifier)。
+# 当你正看着该 session 的 Ghostty tab 时不弹。
 #
 # Wire it (done by install.sh) into ~/.claude/settings.json on Stop/Notification:
 #   { "type": "command", "command": "~/.local/bin/claude-notify", "async": true }
@@ -27,13 +29,22 @@ set -u
 # 读掉 stdin 上的钩子 JSON(不阻塞 Claude Code 的管道)。
 _stdin="$(cat 2>/dev/null || true)"
 
+# Optional debug trace: `touch ~/.claude/.claude-notify-debug` to enable, then
+# tail ~/.claude/claude-notify.log to see why a notification did/didn't fire.
+# 可选调试:`touch ~/.claude/.claude-notify-debug` 开启,再看 ~/.claude/claude-notify.log
+# 排查通知为何弹/不弹。删掉 flag 文件即关闭。
+log_dbg() {
+  [ -f "$HOME/.claude/.claude-notify-debug" ] || return 0
+  printf '%s | %s\n' "$(date '+%H:%M:%S')" "$*" >> "$HOME/.claude/claude-notify.log" 2>/dev/null || true
+}
+log_dbg "── invoked (stdin: $(printf '%s' "$_stdin" | tr -d '\n' | cut -c1-100))"
+
 # ── Resolve helpers / 定位依赖 ──────────────────────────────────────────────
 GTMUX="$(command -v gtmux || true)"; [ -z "$GTMUX" ] && GTMUX="$HOME/.local/bin/gtmux"
 TMUX_BIN="$(command -v tmux || true)"
 if [ -z "$TMUX_BIN" ]; then
   for p in /opt/homebrew/bin/tmux /usr/local/bin/tmux; do [ -x "$p" ] && TMUX_BIN="$p" && break; done
 fi
-OVERLAY="${CLAUDE_NOTIFY_OVERLAY:-$HOME/.local/share/gtmux/notify-overlay.js}"
 
 # ── Which tmux session is this agent in? ────────────────────────────────────
 # Claude Code hooks inherit $TMUX / $TMUX_PANE when Claude runs inside tmux.
@@ -44,7 +55,7 @@ if [ -n "${TMUX:-}" ] && [ -n "$TMUX_BIN" ]; then
 fi
 
 TITLE="${SESSION:-Claude Code}"
-MSG="Agent finished — click to open / agent 完成,点击打开"
+log_dbg "session=[$SESSION] TMUX=[${TMUX:-}] PANE=[${TMUX_PANE:-}] TERM_PROGRAM=[${TERM_PROGRAM:-}]"
 
 # ── Suppress when you're already watching this session's Ghostty tab ─────────
 # Inside tmux $TERM_PROGRAM is "tmux", so detect Ghostty via AppleScript, not env.
@@ -63,34 +74,53 @@ is_watching() {
     return ""
   end tell' 2>/dev/null || true)"
   case "$sel" in
-    "$SESSION"|"$SESSION — "*) return 0;;
-    *) return 1;;
+    "$SESSION"|"$SESSION — "*) front_sel_match=1; return 0;;
+    *) front_sel_match=0; return 1;;
   esac
 }
-is_watching && exit 0
+front_sel_match=""
+if is_watching; then
+  log_dbg "decision=SUPPRESS (you're watching '$SESSION')"
+  exit 0
+fi
+log_dbg "decision=NOTIFY (front_sel_match=$front_sel_match)"
 
 # ── Notify (auto-pick notifier) / 发通知(自动选通知器)──────────────────────
 # nohup + </dev/null fully detaches the notifier so it survives this hook exiting.
-# nohup + </dev/null 让通知器彻底脱离,本钩子退出后它仍在跑。
+# When debugging, send the notifier's stderr to the log instead of /dev/null.
+# nohup + </dev/null 让通知器彻底脱离,本钩子退出后它仍在跑。调试时把通知器的
+# stderr 写进日志(而非 /dev/null),便于看报错。
+NERR=/dev/null
+[ -f "$HOME/.claude/.claude-notify-debug" ] && NERR="$HOME/.claude/claude-notify.log"
 if command -v terminal-notifier >/dev/null 2>&1; then
-  # -execute runs via /bin/sh -c; quote the (possibly spaced) session name.
-  # -execute 经 /bin/sh -c 执行;给(可能带空格的)session 名加引号。
+  # Preferred: native + CLICKABLE. -execute runs via /bin/sh -c on click;
+  # quote the (possibly spaced) session name so `gtmux focus` gets one arg.
+  # 首选:原生 + 可点击。点击时 -execute 经 /bin/sh -c 执行;给(可能带空格的)
+  # session 名加引号,让 `gtmux focus` 收到单个参数。
+  log_dbg "notifier=terminal-notifier (clickable)"
   if [ -n "$SESSION" ]; then
-    nohup terminal-notifier -title "$TITLE" -message "$MSG" \
-      -group "claude-notify-$SESSION" \
-      -execute "$GTMUX focus \"$SESSION\"" </dev/null >/dev/null 2>&1 &
+    nohup terminal-notifier -title "$TITLE" -message "Agent finished — click to open" \
+      -sound default -group "claude-notify-$SESSION" \
+      -execute "$GTMUX focus \"$SESSION\"" </dev/null >/dev/null 2>>"$NERR" &
   else
-    nohup terminal-notifier -title "$TITLE" -message "$MSG" </dev/null >/dev/null 2>&1 &
+    nohup terminal-notifier -title "Claude Code" -message "Agent finished" \
+      -sound default </dev/null >/dev/null 2>>"$NERR" &
   fi
-elif [ -f "$OVERLAY" ]; then
-  # JXA overlay: argv = title, message, session, gtmux-path. Click runs
-  # `gtmux focus <session>` via NSTask (no shell quoting needed).
-  # JXA 浮层:argv = 标题、正文、session、gtmux 路径。点击经 NSTask 跑
-  # `gtmux focus <session>`(无需 shell 引号)。
-  nohup /usr/bin/osascript -l JavaScript "$OVERLAY" "$TITLE" "$MSG" "${SESSION:-}" "$GTMUX" </dev/null >/dev/null 2>&1 &
 else
-  # Last resort: a plain banner (no click-through). / 兜底:普通通知(不可点)。
-  nohup /usr/bin/osascript -e "display notification \"$MSG\" with title \"$TITLE\"" </dev/null >/dev/null 2>&1 &
+  # Fallback: native system banner — reliable, but NOT clickable (macOS has no
+  # zero-dependency clickable notification). Put the session in the text so you
+  # can jump with `gtmux focus <session>`. Install terminal-notifier for clicks.
+  # 兜底:原生系统通知 —— 可靠,但【不可点击】(macOS 没有零依赖的可点击通知)。
+  # 把 session 名放进文案,你可手动 `gtmux focus <session>` 跳过去。装 terminal-notifier
+  # 即可点击直达。
+  log_dbg "notifier=osascript display notification (no terminal-notifier; not clickable)"
+  _body="Agent finished"
+  [ -n "$SESSION" ] && _body="Agent finished — gtmux focus $SESSION"
+  # Escape double-quotes for the AppleScript string literal. / 转义 AppleScript 字符串里的双引号。
+  _t=$(printf '%s' "$TITLE" | sed 's/"/\\"/g')
+  _b=$(printf '%s' "$_body" | sed 's/"/\\"/g')
+  nohup /usr/bin/osascript -e "display notification \"$_b\" with title \"$_t\" sound name \"Glass\"" \
+    </dev/null >/dev/null 2>>"$NERR" &
 fi
 
 exit 0

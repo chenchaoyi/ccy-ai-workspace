@@ -21,8 +21,7 @@ terminal/
 ├── scripts/
 │   ├── gtmux            Ghostty↔tmux 工作区的统一命令行:
 │   │                      restore(一键接回)· overview(前缀+g 弹窗)· focus(跳到对应 tab)
-│   ├── claude-notify    Claude Code 钩子:agent 完成弹通知,点击→ gtmux focus
-│   └── notify-overlay.js 零依赖可点击通知浮层(没装 terminal-notifier 时的兜底)
+│   └── claude-notify    Claude Code 钩子:agent 完成弹通知,点击→ gtmux focus
 ├── shell/
 │   └── ghostty-cwd.bash macOS bash 3.2 的目录上报(让新窗口继承工作目录)
 └── docs/
@@ -207,9 +206,10 @@ tab。**在 tmux 下这条路是断的** —— tmux 会丢掉那条裸通知转
 
 - **任意** tmux session 里 agent 完成都会弹桌面通知 —— 包括你没在看的那些 ——
   并且**你正盯着该 session 的 Ghostty tab 时保持安静**。
-- **点击它会跑 `gtmux focus <session>`**,直接落到对应 tab。
-- 自动选通知器:装了 `terminal-notifier` 就用它(原生、可点击),否则用自带的
-  零依赖 JXA 浮层(`notify-overlay.js`)。
+- 装了 **`terminal-notifier`** 时通知**可点击 —— 点击会跑 `gtmux focus <session>`**
+  落到对应 tab(安装器会提示 `brew install` 它)。没装也有可靠的原生通知,只是
+  不可点(macOS 没有零依赖的可点击通知);文案里带 session 名,你可自己
+  `gtmux focus <名字>` 跳过去。
 - 自包含 —— 不依赖任何插件。检测到 peon-ping 时,安装器会**提示你关掉 peon 自己的
   桌面通知(和 `terminal_tab_title`)**,免得双弹或跟 `set-titles` 抢标题。
 

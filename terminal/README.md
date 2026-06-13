@@ -22,8 +22,7 @@ terminal/
 ├── scripts/
 │   ├── gtmux            one CLI for the Ghostty↔tmux workspace:
 │   │                      restore (reattach all) · overview (prefix+g popup) · focus (jump to a tab)
-│   ├── claude-notify    Claude Code hook: agent-done desktop notification, click → gtmux focus
-│   └── notify-overlay.js zero-dependency clickable banner (fallback when no terminal-notifier)
+│   └── claude-notify    Claude Code hook: agent-done desktop notification, click → gtmux focus
 ├── shell/
 │   └── ghostty-cwd.bash cwd reporting for macOS bash 3.2 (new windows inherit cwd)
 └── docs/
@@ -223,9 +222,11 @@ has no tab to surface. `claude-notify` (a Claude Code hook installed by
 - Fires a desktop notification when an agent finishes in **any** tmux
   session — including ones you aren't looking at — and **stays silent when
   you're already watching that session's Ghostty tab**.
-- **Clicking it runs `gtmux focus <session>`**, landing you on the right tab.
-- Picks its notifier automatically: `terminal-notifier` if installed (native,
-  clickable), else a bundled zero-dependency JXA overlay (`notify-overlay.js`).
+- With **`terminal-notifier`** the notification is **clickable — the click runs
+  `gtmux focus <session>`** and lands you on the right tab. The installer offers
+  to `brew install` it. Without it you still get a reliable native banner, just
+  not clickable (macOS has no zero-dependency clickable notification); it puts
+  the session name in the text so you can `gtmux focus <name>` yourself.
 - Self-contained — no plugin dependency. If peon-ping is present, the installer
   offers to silence peon's own desktop notifications (and `terminal_tab_title`)
   so you don't get double banners or a title fight with `set-titles`.

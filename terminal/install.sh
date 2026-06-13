@@ -444,39 +444,43 @@ if ! infocmp tmux-256color >/dev/null 2>&1; then
 fi
 
 # ---- 7) Claude Code agent-done notifications (optional) --------------------
-# Click-through desktop notification when an agent finishes in any tmux session,
-# landing you on its Ghostty tab via `gtmux focus`. Self-contained (no plugin
-# dependency); auto-picks terminal-notifier (clickable) or a bundled JXA overlay.
-# Opt-in because it edits ~/.claude/settings.json (a different tool's config).
-# 可点击的"agent 完成"桌面通知:任意 tmux session 里 agent 跑完即弹,点击经
-# `gtmux focus` 跳到它的 Ghostty tab。自包含(不依赖插件);自动选 terminal-notifier
-# (可点击)或自带 JXA 浮层。默认 opt-in,因为它要改 ~/.claude/settings.json(别的工具的配置)。
+# Desktop notification when an agent finishes in any tmux session. With
+# terminal-notifier it is CLICKABLE — the click runs `gtmux focus` to land on
+# the right Ghostty tab; without it, a reliable but non-clickable native banner.
+# Self-contained (no plugin dependency). Opt-in because it edits
+# ~/.claude/settings.json (a different tool's config).
+# "agent 完成"桌面通知:任意 tmux session 里 agent 跑完即弹。装了 terminal-notifier
+# 则【可点击】—— 点击跑 `gtmux focus` 跳到对应 Ghostty tab;没装则是可靠但不可点击的
+# 原生通知。自包含(不依赖插件)。opt-in,因为它要改 ~/.claude/settings.json(别的工具的配置)。
 say "== 7/7 Claude Code notifications (optional) ==" "== 7/7 Claude Code 完成通知(可选)=="
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS="$CLAUDE_DIR/settings.json"
 if [ ! -d "$CLAUDE_DIR" ]; then
   say "ℹ Claude Code not detected (~/.claude absent) — skipping notification setup" \
       "ℹ 未检测到 Claude Code(无 ~/.claude)—— 跳过通知设置"
-elif confirm "Enable click-through 'agent finished' desktop notifications? [y/N] " \
-             "启用可点击的「agent 完成」桌面通知吗?[y/N] "; then
-  # 7a) Install the hook script + the zero-dependency overlay
+elif confirm "Enable 'agent finished' desktop notifications? [y/N] " \
+             "启用「agent 完成」桌面通知吗?[y/N] "; then
+  # 7a) Install the hook script
   install_file "$DIR/scripts/claude-notify" "$HOME/.local/bin/claude-notify"
   chmod +x "$HOME/.local/bin/claude-notify"
-  install_file "$DIR/scripts/notify-overlay.js" "$HOME/.local/share/gtmux/notify-overlay.js"
 
-  # 7b) Notifier: overlay always works; terminal-notifier is a nicer native option
+  # 7b) Notifier: terminal-notifier makes the notification CLICKABLE (click →
+  # gtmux focus). Without it the hook still notifies, just not clickable, so
+  # strongly recommend installing it.
+  # 7b) 通知器:terminal-notifier 让通知【可点击】(点击→ gtmux focus)。没装也能弹,
+  # 只是不可点,所以强烈建议装上。
   if command -v terminal-notifier >/dev/null 2>&1; then
-    say "✓ terminal-notifier found — notifications will use it (native, clickable)" \
-        "✓ 已找到 terminal-notifier —— 通知将用它(原生、可点击)"
+    say "✓ terminal-notifier found — notifications will be native & clickable" \
+        "✓ 已找到 terminal-notifier —— 通知将是原生且可点击"
   else
-    say "ℹ Using the bundled JXA overlay (zero-dependency, clickable)." \
-        "ℹ 使用自带 JXA 浮层(零依赖、可点击)。"
+    say "ℹ Without terminal-notifier you'll get a reliable but NON-clickable banner." \
+        "ℹ 没有 terminal-notifier 时通知可靠但【不可点击】。"
     if command -v brew >/dev/null 2>&1 && \
-       confirm "  Also install terminal-notifier for native banners? [y/N] " \
-               "  另外装 terminal-notifier 用原生通知栏吗?[y/N] "; then
+       confirm "  Install terminal-notifier now for click-through? [y/N] " \
+               "  现在装 terminal-notifier 以支持点击直达吗?[y/N] "; then
       brew install terminal-notifier \
-        || say "  ⚠ install failed — the overlay still works" \
-               "  ⚠ 安装失败 —— 浮层仍可用"
+        || say "  ⚠ install failed — notifications still work (not clickable)" \
+               "  ⚠ 安装失败 —— 通知仍可用(不可点击)"
     fi
   fi
 
