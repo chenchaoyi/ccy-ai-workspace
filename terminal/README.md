@@ -19,9 +19,9 @@ terminal/
 ├── tmux/
 │   ├── tmux.conf        tmux config (keeps default Ctrl+b prefix)
 │   └── cheatsheet.txt   quick reference shown by the prefix+g popup
+├── gtmux/              the gtmux CLI (Go): overview · agents · restore · focus
+│                          (install.sh builds it to ~/.local/bin/gtmux)
 ├── scripts/
-│   ├── gtmux            one CLI for the Ghostty↔tmux workspace:
-│   │                      restore (reattach all) · overview (prefix+g popup) · focus (jump to a tab)
 │   └── claude-notify    Claude Code hook: agent-done notification, click → exact pane (install.sh generates GtmuxFocus.app)
 ├── shell/
 │   └── ghostty-cwd.bash cwd reporting for macOS bash 3.2 (new windows inherit cwd)
@@ -135,12 +135,35 @@ write side (`set-titles`) and the read side (`focus`) are one feature.
 
 ## The `gtmux` CLI — one command for the Ghostty↔tmux workspace
 
-`gtmux` drives Ghostty from the tmux state layer. One command, three verbs —
-**`restore`** (build tabs), **`overview`** (see state), **`focus`** (jump to a
-tab) — covering a tab's whole life. It's a plain executable invoked explicitly
-(no bashrc/zshrc hooks), so it works with any shell. Run bare `gtmux` for the
-overview. Output language follows `--lang=en|zh` (default `en`) or `$GTMUX_LANG`;
+`gtmux` drives Ghostty from the tmux state layer. One command, four verbs —
+**`overview`** (see state), **`agents`** (see your coding agents), **`restore`**
+(build tabs), **`focus`** (jump to a tab/pane) — covering a tab's whole life.
+It's a single Go binary (built by `install.sh`; needs the Go toolchain for now,
+prebuilt binaries once it's a standalone repo) invoked explicitly — no
+bashrc/zshrc hooks, works with any shell. Run bare `gtmux` for the overview.
+Output language follows `--lang=en|zh` (default `en`) or `$GTMUX_LANG`;
 `gtmux --help` shows full usage.
+
+### `gtmux agents` — see your coding agents at a glance
+
+```
+gtmux agents — 6 agents
+
+✳ idle     Diting:0.0             Claude Code   %1
+✳ idle     Pica:0.0              去除6月6日的爬取   %7  ✓ latest
+⠿ working  ccy-workspace:0.0     Auto-attach tmux sessions in Ghostty   %11
+
+jump: gtmux focus <pane>   (e.g. gtmux focus %11)
+```
+
+Lists every tmux pane running a coding agent, with its **status** — `⠿ working`
+vs `✳ idle` — its location, the task, and the **pane id to jump to**. It reads
+the status from the pane title the agent sets itself (Claude Code shows a braille
+spinner while working, `✳` when idle); other agents are matched by command name.
+The pane that most recently finished (the one `claude-notify` pinged about) is
+flagged `✓ latest`. Jump to any with `gtmux focus <pane>`. This is the
+multi-agent control panel — one place to see who's working, who's idle, and who
+just finished.
 
 ### `gtmux restore` — reattach sessions to tabs
 
@@ -271,7 +294,7 @@ Ghostty sees the real directory even when you live in tmux.
 | Pane switching | **vi-style h/j/k/l** (arrows also work) | vim muscle memory |
 | Persistence | tmux + resurrect + continuum | restore session/window/cwd across restarts |
 | Tab naming | name sessions/windows in tmux; **`set-titles` mirrors them onto Ghostty tabs** | titles live in the state layer — survive quit/reboot, auto-correct after `gtmux restore`, zero manual renaming |
-| Workspace CLI | **one `gtmux`**: `restore` (reattach) · `overview` (prefix+g popup) · `focus <name>` (jump to a tab) | one command, three verbs; `focus` reads the `set-titles` titles to land on the right tab |
+| Workspace CLI | **one `gtmux`** (Go): `overview` · `agents` · `restore` · `focus` | one command for the whole workspace + multi-agent status; `--lang=en|zh` |
 | What's running? | **prefix+g** session overview popup (also `gtmux overview` in any shell) | counts + per-session windows/panes at a glance |
 | Agent-done alerts | **`claude-notify`** hook: notify on finish, **click → exact pane** (via `GtmuxFocus.app` + `-activate`); also `prefix+J` | restores Ghostty's click-through that tmux kills, lands on the precise pane; quiet when you're watching; peon-independent |
 | Forgot a key? | **prefix+G** cheatsheet popup; prefix+? full list; prefix+/ then a key explains it | look it up without leaving tmux |

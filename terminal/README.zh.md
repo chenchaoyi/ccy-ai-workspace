@@ -18,9 +18,9 @@ terminal/
 ├── tmux/
 │   ├── tmux.conf        tmux 配置(保留默认 Ctrl+b 前缀)
 │   └── cheatsheet.txt   前缀+g 弹窗显示的命令速查表
+├── gtmux/              gtmux 命令行(Go):overview · agents · restore · focus
+│                          (install.sh 编译到 ~/.local/bin/gtmux)
 ├── scripts/
-│   ├── gtmux            Ghostty↔tmux 工作区的统一命令行:
-│   │                      restore(一键接回)· overview(前缀+g 弹窗)· focus(跳到对应 tab)
 │   └── claude-notify    Claude Code 钩子:agent 完成弹通知,点击→ 确切 pane(install.sh 生成 GtmuxFocus.app)
 ├── shell/
 │   └── ghostty-cwd.bash macOS bash 3.2 的目录上报(让新窗口继承工作目录)
@@ -126,11 +126,30 @@ tab 的原因 —— 写的一侧(`set-titles`)和读的一侧(`focus`)是同一
 
 ## `gtmux` 命令行 —— 一个命令管 Ghostty↔tmux 工作区
 
-`gtmux` 用 tmux 状态层驱动 Ghostty。一个命令,三个动词 —— **`restore`**(建 tab)、
-**`overview`**(看现状)、**`focus`**(跳到 tab)—— 覆盖一个 tab 的完整生命周期。
-它是个显式调用的普通可执行脚本(不碰 bashrc/zshrc),换什么 shell 都能用。
-不带参数直接敲 `gtmux` 就是看概览。输出语言由 `--lang=en|zh`(默认 `en`)或
-`$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
+`gtmux` 用 tmux 状态层驱动 Ghostty。一个命令,四个动词 —— **`overview`**(看现状)、
+**`agents`**(看你的 coding agent)、**`restore`**(建 tab)、**`focus`**(跳到 tab/pane)
+—— 覆盖一个 tab 的完整生命周期。它是个单文件 Go 二进制(由 `install.sh` 编译,目前
+需要 Go 工具链;抽成独立仓库后会有预编译二进制),显式调用、不碰 bashrc/zshrc,换什么
+shell 都能用。不带参数直接敲 `gtmux` 就是看概览。输出语言由 `--lang=en|zh`(默认 `en`)
+或 `$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
+
+### `gtmux agents` —— 一眼看清你的 coding agent
+
+```
+gtmux agent — 6 agent
+
+✳ 空闲    Diting:0.0             Claude Code   %1
+✳ 空闲    Pica:0.0              去除6月6日的爬取   %7  ✓ 最近完成
+⠿ 运行中  ccy-workspace:0.0     Auto-attach tmux sessions in Ghostty   %11
+
+跳转: gtmux focus <pane>   (例如 gtmux focus %11)
+```
+
+列出每个跑着 coding agent 的 tmux pane,带**状态**(`⠿ 运行中` / `✳ 空闲`)、位置、
+任务,以及**可跳转的 pane id**。状态读自 agent 自己设的 pane 标题(Claude Code 工作时
+显示盲文 spinner、空闲时显示 `✳`);其它 agent 按命令名匹配。最近一个完成的 pane
+(就是 `claude-notify` 弹的那条)标 `✓ 最近完成`。`gtmux focus <pane>` 跳过去。
+这就是**多 agent 指挥台** —— 一处看清谁在跑、谁空闲、谁刚完成。
 
 ### `gtmux restore` —— 把 session 接回成 tab
 
@@ -246,7 +265,7 @@ tmux.conf 已开 `allow-passthrough on`),常驻 tmux 时 Ghostty 也能拿到真
 | pane 切换 | **vi 风格 h/j/k/l**(方向键也可) | 习惯 vim 手感 |
 | 持久化 | tmux + resurrect + continuum | 跨重启恢复 session/window/cwd,比快照工具更彻底 |
 | tab 命名 | 名字起在 tmux 的 session/window 上,**`set-titles` 自动映射到 Ghostty tab 标题** | 名字活在状态层 —— quit/重启不丢,`gtmux restore` 接回后自动正确,零手动命名 |
-| 工作区命令行 | **一个 `gtmux`**:`restore`(接回)·`overview`(前缀+g 弹窗)·`focus <名字>`(跳到 tab) | 一个命令三个动词;`focus` 读 `set-titles` 写的标题精确落到对应 tab |
+| 工作区命令行 | **一个 `gtmux`**(Go):`overview` · `agents` · `restore` · `focus` | 一个命令管整个工作区 + 多 agent 状态;`--lang=en|zh` |
 | 现在跑着什么? | **前缀+g** session 概览弹窗(shell 里也可 `gtmux overview`) | 一眼看清 session/window/pane 数量与明细 |
 | agent 完成提醒 | **`claude-notify`** 钩子:完成弹通知,**点击→ 确切 pane**(靠 `GtmuxFocus.app` + `-activate`);也可 `前缀+J` | 补回 tmux 下被掐断的"点击直达"通知,精确落到 agent 所在 pane;在看时不打扰;不依赖 peon |
 | 忘了按键? | **前缀+G** 速查表弹窗;前缀+? 全量键位;前缀+/ 再按某键=解释它 | 不离开 tmux 随手查 |

@@ -9,7 +9,7 @@
 # What it does / 做什么:
 #   - Ghostty config      -> ~/.config/ghostty/config
 #   - tmux config         -> ~/.tmux.conf
-#   - gtmux CLI           -> ~/.local/bin/gtmux (restore / overview / focus)
+#   - gtmux CLI (Go)      -> ~/.local/bin/gtmux (overview / agents / restore / focus)
 #   - cwd reporter        -> ~/.ghostty-cwd.bash (for macOS bash 3.2)
 #   - tpm + tmux plugins (headless, no prefix+I needed)
 #
@@ -347,9 +347,25 @@ install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
 # 安装到 PATH(~/.local/bin)的独立命令行,与 shell 配置无关。一个命令三个动词:
 # `gtmux restore`(一键接回全部 session)、`gtmux overview`(前缀+g 弹窗,也可直接跑)、
 # `gtmux focus <名字>`(跳到对应 tab)。
-say "== 3/7 CLI tool (gtmux) ==" "== 3/7 命令行工具(gtmux)=="
-install_file "$DIR/scripts/gtmux" "$HOME/.local/bin/gtmux"
-chmod +x "$HOME/.local/bin/gtmux"
+say "== 3/7 CLI tool (gtmux, Go) ==" "== 3/7 命令行工具(gtmux,Go)=="
+# gtmux is a Go program (terminal/gtmux). Build it with the local Go toolchain
+# and install the binary. (Standalone repo will ship prebuilt binaries later.)
+# gtmux 是 Go 程序(terminal/gtmux):用本机 Go 工具链编译后安装二进制。
+# (将来独立仓库会提供预编译二进制。)
+if command -v go >/dev/null 2>&1; then
+  _gobin="$(mktemp -d)/gtmux"
+  if ( cd "$DIR/gtmux" && go build -trimpath -o "$_gobin" . ); then
+    install_file "$_gobin" "$HOME/.local/bin/gtmux"
+    chmod +x "$HOME/.local/bin/gtmux"
+  else
+    say_err "✗ gtmux build failed (go build) — skipping; fix Go and re-run" \
+            "✗ gtmux 编译失败(go build)—— 跳过;修好 Go 后重跑"
+  fi
+  rm -rf "$(dirname "$_gobin")" 2>/dev/null
+else
+  say "⚠ Go not found — gtmux not installed. Install Go (brew install go) and re-run." \
+      "⚠ 未找到 Go —— 未安装 gtmux。装 Go(brew install go)后重跑。"
+fi
 # Legacy CLIs folded into gtmux: back up and remove the old standalone names
 # (~/.local/bin/tmux-restore, ~/.local/bin/tmux-overview, ~/tmux-restore).
 # 旧的两个独立命令行已并入 gtmux:备份后移除旧名字。
