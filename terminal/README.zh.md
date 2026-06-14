@@ -150,9 +150,9 @@ gtmux agent — 6 agent · 1 运行中 · 5 空闲
 (`⠿ 运行中` / `✳ 空闲` / `● running`)、**agent 类型**(Claude Code、Codex、Gemini、
 aider…)、位置、任务、**pane id** —— 运行中的排在最前,表头给状态分布。
 
-跑 **`gtmux agents --watch`** 是一个可常驻的实时面板:每 ~1.5 秒自刷新,**↑/↓** 选行、
-**Enter** 跳到那个 pane、**r** 刷新、**q** 退出。看着的时候有 agent 完成(运行中 → 空闲)
-会标 `✓ 完成`,完成动态实时可见。
+跑 **`gtmux agents --watch`** 是一个可常驻的实时面板(也可用 **`前缀 + a`** 随手弹出):
+每 ~1.5 秒自刷新,**↑/↓** 选行、**Enter** 跳到那个 pane、**r** 刷新、**q** 退出。看着的
+时候有 agent 完成(运行中 → 空闲)会标 `✓ 完成`,完成动态实时可见。
 
 检测**不锁死 Claude**:
 - **状态**读自 agent 自己设的 pane 标题。标题以盲文 spinner(`⠋⠙⠹…`,多数 agent TUI

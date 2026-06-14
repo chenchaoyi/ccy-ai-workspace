@@ -163,9 +163,10 @@ the **agent** (Claude Code, Codex, Gemini, aider, …), location, the task, and 
 **pane id** — working agents sorted first, with a status breakdown in the header.
 
 Run **`gtmux agents --watch`** for a live, auto-refreshing dashboard you can keep
-open in a pane: it polls every ~1.5s, **↑/↓** select a row, **Enter** jumps to
-that pane, **r** refreshes, **q** quits. Agents that finish while you watch
-(working → idle) get flagged `✓ done` so you notice completions in real time.
+open in a pane — or pop it open anytime with **`prefix + a`**: it polls every
+~1.5s, **↑/↓** select a row, **Enter** jumps to that pane, **r** refreshes, **q**
+quits. Agents that finish while you watch (working → idle) get flagged `✓ done`
+so you notice completions in real time.
 
 Detection is **not Claude-only**:
 - **Status** comes from the pane title the agent sets itself. A leading braille
