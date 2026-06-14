@@ -173,6 +173,11 @@ Detection is **not Claude-only**:
 - The pane that most recently finished (the one `claude-notify` pinged about) is
   flagged `✓ latest`.
 
+A pane is listed only if the agent **process is actually running** (foreground
+command is the agent, or the title is animating a spinner). A leftover agent
+title over a plain shell — e.g. a session restored by tmux-resurrect where the
+agent was never relaunched — is **not** counted.
+
 > Precise *working vs idle* needs the agent to signal it (a spinner, or a known
 > idle glyph). Agents detected only by command name but with no title signal
 > show `● running` (process up); add an `idleGlyph` in the config to refine them.

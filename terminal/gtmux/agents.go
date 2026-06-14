@@ -61,73 +61,83 @@ type agentPane struct {
 // the de-facto spinner glyph most agent TUIs animate while working.
 func isBrailleSpinner(r rune) bool { return r >= 0x2800 && r <= 0x28FF }
 
-// classifyAgent decides whether a pane runs a coding agent, which one, and its
-// status. Order: command match (most reliable) → title-name match (catches
-// agents whose command is a version string, like Claude Code) → glyph only.
+// cmdIsLiveAgent reports whether the foreground command is a live agent process
+// and its display name. Claude Code's foreground command is its version string.
+func cmdIsLiveAgent(cmd string, profiles []agentProfile) (name string, live bool) {
+	for _, p := range profiles {
+		for _, c := range p.Commands {
+			if cmd == c {
+				return p.Name, true
+			}
+		}
+	}
+	if claudeVersionRe.MatchString(cmd) {
+		return "Claude Code", true
+	}
+	return "", false
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// classifyAgent decides whether a pane runs a LIVE coding agent, which one, and
+// its status. A pane counts ONLY if the agent process is actually running (its
+// foreground command is the agent) OR its title is animating a braille spinner
+// (active work, e.g. a tool subprocess). A leftover agent title on a pane that
+// has returned to a plain shell — e.g. resurrect-restored with the agent not
+// relaunched, or the agent simply exited — does NOT count. That stale-title case
+// was the false positive (a "✳ Claude Code" title over a bash prompt).
 func classifyAgent(title, cmd string, profiles []agentProfile) (isAgent bool, agent, status, task string) {
 	t := strings.TrimSpace(title)
 	rs := []rune(t)
 
-	// Agent name by command, then by name appearing in the title.
-	for _, p := range profiles {
-		for _, c := range p.Commands {
-			if cmd == c {
-				agent = p.Name
-			}
-		}
-		if agent != "" {
-			break
-		}
-	}
-	if agent == "" {
-		for i := range profiles {
-			if strings.Contains(t, profiles[i].Name) {
-				agent = profiles[i].Name
-				break
-			}
-		}
-	}
-	if agent == "" && claudeVersionRe.MatchString(cmd) {
-		agent = "Claude Code" // working Claude pane (command is its version string)
-	}
-
-	// Status from the leading title glyph.
-	hasGlyph := false
-	if len(rs) > 0 {
-		switch {
-		case isBrailleSpinner(rs[0]):
-			status, hasGlyph = "working", true
-		case rs[0] == 0x2733: // ✳ → idle/ready (Claude Code's marker)
-			status, hasGlyph = "idle", true
-			if agent == "" {
-				agent = "Claude Code"
-			}
-		default:
-			// match a profile's custom idle glyph
+	spinner := len(rs) > 0 && isBrailleSpinner(rs[0])
+	idle := false
+	if len(rs) > 0 && !spinner {
+		if rs[0] == 0x2733 { // ✳ → idle/ready (Claude Code's marker)
+			idle = true
+		} else {
 			for _, p := range profiles {
 				if p.IdleGlyph != "" && strings.HasPrefix(t, p.IdleGlyph) {
-					status, hasGlyph = "idle", true
-					if agent == "" {
-						agent = p.Name
-					}
+					idle = true
+					break
 				}
 			}
 		}
 	}
 
-	if status == "" && agent != "" {
-		status = "running" // command-detected agent, no title state signal
-	}
-	if status != "" && agent == "" {
-		agent = tr("agent", "agent") // working spinner but unknown type
+	name, live := cmdIsLiveAgent(cmd, profiles)
+	titleName := ""
+	for i := range profiles {
+		if strings.Contains(t, profiles[i].Name) {
+			titleName = profiles[i].Name
+			break
+		}
 	}
 
-	isAgent = agent != "" || status != ""
-	if !isAgent {
+	switch {
+	case spinner: // actively working — count regardless of foreground command
+		status = "working"
+		agent = firstNonEmpty(name, titleName, tr("agent", "agent"))
+	case live: // agent process is alive (idle at its prompt, or just running)
+		if idle {
+			status = "idle"
+		} else {
+			status = "running"
+		}
+		agent = firstNonEmpty(name, titleName, tr("agent", "agent"))
+	default: // plain shell with a leftover agent title → not actually running
 		return false, "", "", ""
 	}
+
 	task = t
-	if hasGlyph && len(rs) > 1 {
+	if (spinner || idle) && len(rs) > 1 {
 		task = strings.TrimSpace(string(rs[1:]))
 	}
 	if task == agent { // title is just the placeholder name, not a real task

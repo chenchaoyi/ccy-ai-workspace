@@ -159,6 +159,9 @@ aider…)、位置、任务、**pane id** —— 运行中的排在最前,表头
   的 JSON 数组;你的条目优先于内置。
 - 最近一个完成的 pane(就是 `claude-notify` 弹的那条)标 `✓ 最近完成`。
 
+只有 agent **进程真的在跑**(前台命令是 agent,或标题在转 spinner)才会被列出。普通 shell
+上残留的 agent 标题 —— 比如 tmux-resurrect 恢复回来但没重启 agent 的 session —— **不会**算进去。
+
 > 精确的"运行中 vs 空闲"要靠 agent 自己发信号(spinner,或已知的空闲字形)。只靠命令名
 > 识别、又没有标题信号的 agent 显示 `● running`(进程在跑);在配置里给它加 `idleGlyph` 即可细化。
 
