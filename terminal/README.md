@@ -147,23 +147,35 @@ Output language follows `--lang=en|zh` (default `en`) or `$GTMUX_LANG`;
 ### `gtmux agents` — see your coding agents at a glance
 
 ```
-gtmux agents — 6 agents
+gtmux agents — 6 agents · 1 working · 5 idle
 
-✳ idle     Diting:0.0             Claude Code   %1
-✳ idle     Pica:0.0              去除6月6日的爬取   %7  ✓ latest
-⠿ working  ccy-workspace:0.0     Auto-attach tmux sessions in Ghostty   %11
+⠿ working  Claude Code  ccy-workspace:0.0     Auto-attach tmux sessions…   %11
+✳ idle     Claude Code  Pica:0.0              去除6月6日的爬取               %7
+✳ idle     Claude Code  Rodi:0.0              Rodi feature dev   %8  ✓ latest
+✳ idle     Claude Code  Diting:0.0            —                  %1
 
 jump: gtmux focus <pane>   (e.g. gtmux focus %11)
 ```
 
-Lists every tmux pane running a coding agent, with its **status** — `⠿ working`
-vs `✳ idle` — its location, the task, and the **pane id to jump to**. It reads
-the status from the pane title the agent sets itself (Claude Code shows a braille
-spinner while working, `✳` when idle); other agents are matched by command name.
-The pane that most recently finished (the one `claude-notify` pinged about) is
-flagged `✓ latest`. Jump to any with `gtmux focus <pane>`. This is the
-multi-agent control panel — one place to see who's working, who's idle, and who
-just finished.
+The multi-agent control panel — one place to see who's working, who's idle, and
+who just finished. Each row: **status** (`⠿ working` / `✳ idle` / `● running`),
+the **agent** (Claude Code, Codex, Gemini, aider, …), location, the task, and the
+**pane id** — working agents sorted first, with a status breakdown in the header.
+
+Detection is **not Claude-only**:
+- **Status** comes from the pane title the agent sets itself. A leading braille
+  spinner (`⠋⠙⠹…`, what most agent TUIs animate) means **working**; Claude Code's
+  `✳` means **idle**. This generalizes across agents that use a spinner.
+- **Which agent** is matched by foreground command (`claude`, `codex`, `gemini`,
+  `aider`, `opencode`, …) or by a name in the title.
+- Extend or override the set via **`~/.config/gtmux/agents.json`** — a JSON array
+  of `{"name","commands","idleGlyph"}`; your entries win over the built-ins.
+- The pane that most recently finished (the one `claude-notify` pinged about) is
+  flagged `✓ latest`.
+
+> Precise *working vs idle* needs the agent to signal it (a spinner, or a known
+> idle glyph). Agents detected only by command name but with no title signal
+> show `● running` (process up); add an `idleGlyph` in the config to refine them.
 
 ### `gtmux restore` — reattach sessions to tabs
 
