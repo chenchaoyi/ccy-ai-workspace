@@ -57,15 +57,25 @@ func ensureServer() {
 }
 
 // unattached returns session names with no client attached.
+// Attached flag comes FIRST so the (possibly space-containing) name is the rest.
 func unattached() []string {
 	var out []string
-	for _, line := range tmuxLines("list-sessions", "-F", "#{session_name} #{session_attached}") {
-		f := strings.Fields(line)
-		if len(f) == 2 && f[1] == "0" {
-			out = append(out, f[0])
+	for _, line := range tmuxLines("list-sessions", "-F", "#{session_attached} #{session_name}") {
+		if att, name, ok := splitAttached(line); ok && att == "0" {
+			out = append(out, name)
 		}
 	}
 	return out
+}
+
+// splitAttached parses an "<attached> <session name>" line, where the name may
+// contain spaces. Returns attached flag, name, ok.
+func splitAttached(line string) (att, name string, ok bool) {
+	i := strings.IndexByte(line, ' ')
+	if i < 0 {
+		return "", "", false
+	}
+	return line[:i], line[i+1:], true
 }
 
 // restoreSessions opens one Ghostty tab per session and attaches them all.
@@ -177,10 +187,9 @@ func restorePick(dryRun bool) int {
 		attached bool
 	}
 	var all []sess
-	for _, line := range tmuxLines("list-sessions", "-F", "#{session_name} #{session_attached}") {
-		f := strings.Fields(line)
-		if len(f) == 2 {
-			all = append(all, sess{f[0], f[1] != "0"})
+	for _, line := range tmuxLines("list-sessions", "-F", "#{session_attached} #{session_name}") {
+		if att, name, ok := splitAttached(line); ok {
+			all = append(all, sess{name, att != "0"})
 		}
 	}
 	if len(all) == 0 {
