@@ -129,7 +129,8 @@ tab 的原因 —— 写的一侧(`set-titles`)和读的一侧(`focus`)是同一
 `gtmux` 用 tmux 状态层驱动 Ghostty。一个命令,三个动词 —— **`restore`**(建 tab)、
 **`overview`**(看现状)、**`focus`**(跳到 tab)—— 覆盖一个 tab 的完整生命周期。
 它是个显式调用的普通可执行脚本(不碰 bashrc/zshrc),换什么 shell 都能用。
-不带参数直接敲 `gtmux` 就是看概览。
+不带参数直接敲 `gtmux` 就是看概览。输出语言由 `--lang=en|zh`(默认 `en`)或
+`$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
 
 ### `gtmux restore` —— 把 session 接回成 tab
 

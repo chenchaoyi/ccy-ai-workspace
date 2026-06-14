@@ -139,7 +139,8 @@ write side (`set-titles`) and the read side (`focus`) are one feature.
 **`restore`** (build tabs), **`overview`** (see state), **`focus`** (jump to a
 tab) — covering a tab's whole life. It's a plain executable invoked explicitly
 (no bashrc/zshrc hooks), so it works with any shell. Run bare `gtmux` for the
-overview.
+overview. Output language follows `--lang=en|zh` (default `en`) or `$GTMUX_LANG`;
+`gtmux --help` shows full usage.
 
 ### `gtmux restore` — reattach sessions to tabs
 

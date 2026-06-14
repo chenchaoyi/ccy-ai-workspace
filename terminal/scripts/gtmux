@@ -1,66 +1,25 @@
 #!/usr/bin/env bash
 # ============================================================================
-# gtmux — drive your Ghostty ↔ tmux workspace from the tmux state layer
-# gtmux —— 用 tmux 状态层驱动 Ghostty ↔ tmux 工作区
-#
-# One command, three verbs — covering a tab's whole life:
-# 一个命令,三个动词 —— 覆盖一个 tab 的完整生命周期:
-#
-#   gtmux                      same as `overview` (read-only, safe default)
-#                              等同 `overview`(只读,安全默认)
-#   gtmux overview [--popup]   SEE  — sessions / windows / panes summary
-#                              看   —— session / window / pane 汇总
-#                              (--popup is what prefix+g opens)
-#                              (--popup 就是 prefix+g 弹的那个)
-#   gtmux restore [...]        BUILD — one Ghostty tab per session, attach all
-#                              建   —— 每个 session 一个 Ghostty tab,全部接回
-#       restore --pick           list & choose (numbers / Enter=all / q=cancel)
-#                                列出来选(编号 / 回车=全部 / q=取消);简写 -p
-#       restore <name>           attach that session by name in THIS tab
-#                                按名字把当前 tab 接回指定 session
-#       restore --one            attach the next unattached session in THIS tab
-#                                只把【当前】tab 接回下一个无人连接的 session
-#       restore --dry-run        print what would happen, change nothing
-#                                只打印将要做什么,不实际执行
-#   gtmux focus <name>         JUMP — bring the Ghostty tab showing <name> front
-#                              跳   —— 把显示 <name> 的 Ghostty tab 拉到最前
-#
-# `focus` is the read-side of tmux `set-titles` (set-titles-string '#S — #W'):
-# set-titles writes session names ONTO tab titles, `focus` reads them back to
-# locate a tab. They are one feature — keep set-titles on for `focus` to work.
-# `focus` 是 tmux `set-titles`(set-titles-string '#S — #W')的【读】侧:
-# set-titles 把 session 名【写】到 tab 标题上,`focus` 再【读】回来定位 tab。
-# 二者是一套 —— set-titles 开着,`focus` 才能用。
-#
-# After an unexpected REBOOT the tmux server itself is gone; `restore` (any
-# mode) starts tmux and waits for tmux-continuum to restore the last autosave
-# (sessions/windows/dirs/screen text — NOT running programs).
-# 电脑【意外重启】后 tmux server 没了;`restore`(任一模式)会先启动 tmux,
-# 等 tmux-continuum 恢复最近一次自动存档(session/window/目录/屏幕文本,
-# 【不含正在运行的程序】)。
-#
-# Notes / 注意:
-#   - Tabs are recreated in session-name order; the original tab↔session
-#     arrangement is not recorded anywhere, so it cannot be reproduced exactly.
-#     tab 按 session 名字顺序重建,原顺序没有记录,无法精确复原。
-#   - restore/focus drive Ghostty via AppleScript: the FIRST run asks for
-#     permission ("... wants to control Ghostty") — click Allow. Mis-clicked
-#     Deny? System Settings → Privacy & Security → Automation.
-#     restore/focus 通过 AppleScript 控制 Ghostty:首次运行会弹授权框,点允许;
-#     误点拒绝后到 系统设置 → 隐私与安全性 → 自动化 里改。
-#   - Session names with spaces are not supported. / 不支持带空格的 session 名。
-#
-# Shell-agnostic: a plain executable, works no matter what your login shell is.
-# 与 shell 无关:就是个可执行脚本,bash/zsh/fish 用户都能直接运行。
-# Restore: installed to ~/.local/bin/gtmux by terminal/install.sh
-# 复原:   由 terminal/install.sh 安装到 ~/.local/bin/gtmux
+# gtmux — drive your Ghostty ↔ tmux workspace from the tmux state layer.
+# One command, three verbs: overview (see) · restore (build) · focus (jump).
+# Output language: --lang=en|zh (default en) or the GTMUX_LANG env var.
+# Run `gtmux --help` (or `gtmux --lang=zh --help`) for full usage.
+# Shell-agnostic plain executable; installed to ~/.local/bin/gtmux by install.sh.
 # ============================================================================
 set -u
 
-err() { printf '%s\n' "$*" >&2; }
+# ── Language / 语言 ─────────────────────────────────────────────────────────
+# Default en; GTMUX_LANG sets a default; --lang=en|zh (anywhere in args) wins.
+UI_LANG="${GTMUX_LANG:-en}"
+case "$UI_LANG" in en|zh) ;; *) UI_LANG=en;; esac
 
-# tmux may be absent from PATH when invoked from a bare popup environment
-# 从精简环境的 popup 里调用时 tmux 可能不在 PATH 上
+err() { printf '%s\n' "$*" >&2; }                       # language-neutral stderr
+# say <en> <zh> → stdout in the chosen language; sai = stderr; pn = no newline.
+say() { if [ "$UI_LANG" = zh ]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi; }
+sae() { if [ "$UI_LANG" = zh ]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi >&2; }
+pn()  { if [ "$UI_LANG" = zh ]; then printf '%s'   "$2"; else printf '%s'   "$1"; fi; }
+
+# tmux may be absent from PATH when invoked from a bare popup environment.
 TMUX_BIN="$(command -v tmux || true)"
 if [ -z "$TMUX_BIN" ]; then
   for p in /opt/homebrew/bin/tmux /usr/local/bin/tmux; do
@@ -68,34 +27,42 @@ if [ -z "$TMUX_BIN" ]; then
   done
 fi
 
-# Absolute path to self, for popup re-exec / 自身绝对路径,供 popup 重新调用
+# Absolute path to self, for popup re-exec.
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 B=$'\033[1m'; D=$'\033[2m'; GN=$'\033[32m'; YL=$'\033[33m'; CY=$'\033[36m'; R0=$'\033[0m'
 
 # ════════════════════════════════════════════════════════════════════════════
-# overview — sessions / windows / panes summary  (was: tmux-overview)
-# overview —— session / window / pane 汇总
+# overview — sessions / windows / panes summary
 # ════════════════════════════════════════════════════════════════════════════
-pl() {  # pl <n> <noun> -> "1 window" / "3 windows"
-  if [ "$1" -eq 1 ]; then printf '%s %s' "$1" "$2"; else printf '%s %ss' "$1" "$2"; fi
+pl() {  # pl <n> <noun> -> "1 window" / "3 windows" (en); "3 window" (zh, no plural)
+  if [ "$UI_LANG" = zh ] || [ "$1" -eq 1 ]; then printf '%s %s' "$1" "$2"
+  else printf '%s %ss' "$1" "$2"; fi
 }
 
 ov_render() {
-  local total_s total_w total_p current name attached nwin panes mark
+  local total_s total_w total_p current name attached nwin panes mark pfmt
   total_s="$("$TMUX_BIN" list-sessions 2>/dev/null | grep -c . || true)"
   total_w="$("$TMUX_BIN" list-windows -a 2>/dev/null | grep -c . || true)"
   total_p="$("$TMUX_BIN" list-panes -a 2>/dev/null | grep -c . || true)"
   current=""
   [ -n "${TMUX:-}" ] && current="$("$TMUX_BIN" display-message -p '#{session_name}' 2>/dev/null || true)"
 
-  printf '%stmux overview%s — %s · %s · %s\n' "$B" "$R0" \
-    "$(pl "$total_s" session)" "$(pl "$total_w" window)" "$(pl "$total_p" pane)"
+  if [ "$UI_LANG" = zh ]; then
+    printf '%stmux 概览%s — %s · %s · %s\n' "$B" "$R0" \
+      "$(pl "$total_s" session)" "$(pl "$total_w" window)" "$(pl "$total_p" pane)"
+  else
+    printf '%stmux overview%s — %s · %s · %s\n' "$B" "$R0" \
+      "$(pl "$total_s" session)" "$(pl "$total_w" window)" "$(pl "$total_p" pane)"
+  fi
   echo
+
+  # Per-window pane-count format: pluralize in en, plain in zh.
+  if [ "$UI_LANG" = zh ]; then pfmt="(#{window_panes} pane)"
+  else pfmt="(#{?#{==:#{window_panes},1},1 pane,#{window_panes} panes})"; fi
 
   while IFS='|' read -r name attached nwin; do
     panes="$("$TMUX_BIN" list-panes -s -t "$name" 2>/dev/null | grep -c . || true)"
-    # ▶ current (cyan) / ● attached (green) / ○ detached (yellow)
     if [ -n "$current" ] && [ "$name" = "$current" ]; then
       mark="${CY}▶${R0}"
     elif [ "${attached:-0}" -gt 0 ]; then
@@ -106,35 +73,39 @@ ov_render() {
     printf '%s %s%-20s%s %s · %s\n' "$mark" "$B" "$name" "$R0" \
       "$(pl "$nwin" window)" "$(pl "$panes" pane)"
     "$TMUX_BIN" list-windows -t "$name" \
-      -F "    #{window_index}: #{window_name}#{?window_active, *,}#{?window_zoomed_flag, Z,}#{?window_activity_flag, •,}  ${D}(#{?#{==:#{window_panes},1},1 pane,#{window_panes} panes})${R0}" 2>/dev/null
+      -F "    #{window_index}: #{window_name}#{?window_active, *,}#{?window_zoomed_flag, Z,}#{?window_activity_flag, •,}  ${D}${pfmt}${R0}" 2>/dev/null
     echo
   done < <("$TMUX_BIN" list-sessions -F '#{session_name}|#{session_attached}|#{session_windows}' 2>/dev/null)
 
-  printf '%s▶ current/当前  ● attached/已连接  ○ detached/待接回%s\n' "$D" "$R0"
-  printf '%s* active/活跃  Z zoomed/放大  • new output/新输出   (jump: gtmux focus <name>)%s\n' "$D" "$R0"
+  if [ "$UI_LANG" = zh ]; then
+    printf '%s▶ 当前  ● 已连接  ○ 待接回%s\n' "$D" "$R0"
+    printf '%s* 活跃  Z 放大  • 新输出   (跳转: gtmux focus <名字>)%s\n' "$D" "$R0"
+  else
+    printf '%s▶ current  ● attached  ○ detached%s\n' "$D" "$R0"
+    printf '%s* active  Z zoomed  • new output   (jump: gtmux focus <name>)%s\n' "$D" "$R0"
+  fi
 }
 
 cmd_overview() {
   if [ -z "$TMUX_BIN" ] || ! "$TMUX_BIN" has-session 2>/dev/null; then
-    echo "No tmux server running / 没有运行中的 tmux server"
+    say "No tmux server running" "没有运行中的 tmux server"
     exit 1
   fi
   case "${1:-}" in
     --popup)
       # Fit the popup to the content; fall back to a pager only when it can't fit.
-      # 弹窗高度按内容自适应;放不下时才退回分页器。
       if [ -z "${TMUX:-}" ]; then ov_render; exit 0; fi   # not inside tmux: just print
       content=$(( $(ov_render | wc -l | tr -d ' ') + 3 )) # + popup border & hold hint
       maxh="$("$TMUX_BIN" display-message -p '#{client_height}' 2>/dev/null || echo 40)"
       maxh=$((maxh * 9 / 10))
       if [ "$content" -le "$maxh" ]; then
-        exec "$TMUX_BIN" display-popup -E -w 64 -h "$content" "$SELF overview --hold"
+        exec "$TMUX_BIN" display-popup -E -w 64 -h "$content" "$SELF --lang=$UI_LANG overview --hold"
       else
-        exec "$TMUX_BIN" display-popup -E -w 64 -h "$maxh" "$SELF overview | less -R"
+        exec "$TMUX_BIN" display-popup -E -w 64 -h "$maxh" "$SELF --lang=$UI_LANG overview | less -R"
       fi;;
     --hold)
       ov_render
-      printf '%s%s%s' "$D" "any key to close / 按任意键关闭" "$R0"
+      pn "any key to close" "按任意键关闭"
       IFS= read -r -n1 -s _ 2>/dev/null || true;;
     *)
       ov_render;;
@@ -142,31 +113,29 @@ cmd_overview() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════
-# restore — one Ghostty tab per session, attach all  (was: tmux-restore)
-# restore —— 每个 session 一个 Ghostty tab,全部接回
+# restore — one Ghostty tab per session, attach all
 # ════════════════════════════════════════════════════════════════════════════
 # A throwaway detached session boots the server (config + plugins load, and
 # tmux-continuum kicks off the resurrect restore); wait for the restored
 # sessions to appear, then drop the bootstrap session.
-# 用一次性 detached session 把 server 拉起来(加载配置/插件,continuum 触发
-# resurrect 恢复);等恢复出来的 session 出现后,删掉这个引导 session。
 re_ensure_server() {
   "$TMUX_BIN" has-session 2>/dev/null && return 0
   local boot="gtmux-boot-$$" i
-  echo "tmux server not running — starting it; continuum is restoring the last saved sessions..."
-  echo "tmux server 未运行 —— 正在启动;continuum 正在恢复最近一次保存的 session..."
-  "$TMUX_BIN" new-session -d -s "$boot" || { err "failed to start tmux / 启动 tmux 失败"; exit 1; }
+  say "tmux server not running — starting it; continuum is restoring the last saved sessions..." \
+      "tmux server 未运行 —— 正在启动;continuum 正在恢复最近一次保存的 session..."
+  "$TMUX_BIN" new-session -d -s "$boot" || { sae "failed to start tmux" "启动 tmux 失败"; exit 1; }
   for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
     if "$TMUX_BIN" list-sessions -F '#{session_name}' 2>/dev/null | grep -qvx "$boot"; then
       "$TMUX_BIN" kill-session -t "$boot" 2>/dev/null
-      echo "Restored. Layout/dirs/screen text are back; running programs are NOT (e.g. restart claude with 'claude --resume')."
-      echo "已恢复。布局/目录/屏幕文本都回来了;正在运行的程序不会自动重启(如 claude 用 'claude --resume' 拉起)。"
+      say "Restored. Layout/dirs/screen text are back; running programs are NOT (e.g. restart claude with 'claude --resume')." \
+          "已恢复。布局/目录/屏幕文本都回来了;正在运行的程序不会自动重启(如 claude 用 'claude --resume' 拉起)。"
       return 0
     fi
     sleep 0.5
   done
   "$TMUX_BIN" rename-session -t "$boot" main 2>/dev/null
-  echo "No saved sessions found — created a fresh session 'main'. / 没有找到存档 —— 已新建 session 'main'。"
+  say "No saved sessions found — created a fresh session 'main'." \
+      "没有找到存档 —— 已新建 session 'main'。"
 }
 
 re_unattached() {
@@ -177,8 +146,6 @@ re_unattached() {
 # Attach the given sessions, one Ghostty tab each. If we are a Ghostty tab
 # ourselves, reuse THIS tab for the first session and spawn new tabs only for
 # the rest; otherwise spawn tabs for all of them.
-# 接回给定 session,每个一个 Ghostty tab。若本身就在 Ghostty tab 里运行,当前
-# tab 复用给第一个 session,只为其余 session 开新 tab;否则全部开新 tab。
 re_restore_sessions() {
   local list=("$@") spawn=() keep_first=0 s osa
   if [ "${TERM_PROGRAM:-}" = "ghostty" ] && [ -t 0 ]; then
@@ -203,21 +170,24 @@ re_restore_sessions() {
     osa+="end tell"
 
     if [ "$RE_DRY" = 1 ]; then
-      echo "[dry-run] would open ${#spawn[@]} Ghostty tab(s) for / 将为以下 session 各开一个 tab: ${spawn[*]}"
-      echo "[dry-run] AppleScript:"; printf '%s\n' "$osa"
+      say "[dry-run] would open ${#spawn[@]} Ghostty tab(s) for: ${spawn[*]}" \
+          "[dry-run] 将为以下 session 各开一个 Ghostty tab: ${spawn[*]}"
+      say "[dry-run] AppleScript:" "[dry-run] AppleScript:"; printf '%s\n' "$osa"
     elif ! /usr/bin/osascript -e "$osa" >/dev/null; then
-      err "AppleScript failed. Needs Ghostty 1.3+ and Automation permission"
-      err "(System Settings → Privacy & Security → Automation → allow controlling Ghostty)."
-      err "AppleScript 执行失败:需要 Ghostty 1.3+ 及自动化权限"
-      err "(系统设置 → 隐私与安全性 → 自动化 → 允许控制 Ghostty)。"
-      err "Fallback / 退路: 在每个 tab 里手动运行 gtmux restore --one"
+      sae "AppleScript failed. Needs Ghostty 1.3+ and Automation permission" \
+          "AppleScript 执行失败:需要 Ghostty 1.3+ 及自动化权限"
+      sae "(System Settings → Privacy & Security → Automation → allow controlling Ghostty)." \
+          "(系统设置 → 隐私与安全性 → 自动化 → 允许控制 Ghostty)。"
+      sae "Fallback: run 'gtmux restore --one' in each tab" \
+          "退路: 在每个 tab 里手动运行 gtmux restore --one"
       exit 1
     fi
   fi
 
   if [ "$keep_first" = 1 ]; then
     if [ "$RE_DRY" = 1 ]; then
-      echo "[dry-run] would attach THIS tab to / 当前 tab 将接回: ${list[0]}"
+      say "[dry-run] would attach THIS tab to: ${list[0]}" \
+          "[dry-run] 当前 tab 将接回: ${list[0]}"
       return 0
     fi
     exec "$TMUX_BIN" attach -t "${list[0]}"
@@ -225,7 +195,7 @@ re_restore_sessions() {
 }
 
 cmd_restore() {
-  [ -z "$TMUX_BIN" ] && { err "tmux not installed / 未安装 tmux (brew install tmux)"; exit 1; }
+  [ -z "$TMUX_BIN" ] && { sae "tmux not installed (brew install tmux)" "未安装 tmux (brew install tmux)"; exit 1; }
 
   local MODE=all TARGET=""
   RE_DRY=0
@@ -233,7 +203,7 @@ cmd_restore() {
     case "$arg" in
       --one)      MODE=one;;
       --pick|-p)  MODE=pick;;
-      --all)      MODE=all;;   # legacy alias of the default / 即默认行为
+      --all)      MODE=all;;   # legacy alias of the default
       --dry-run)  RE_DRY=1;;
       -h|--help)  usage; exit 0;;
       *)          TARGET="$arg";;
@@ -241,11 +211,12 @@ cmd_restore() {
   done
 
   if [ -n "${TMUX:-}" ]; then
-    err "Already inside tmux — run this in a fresh tab. / 已在 tmux 内,请在新 tab 里运行。"
+    sae "Already inside tmux — run this in a fresh tab." \
+        "已在 tmux 内,请在新 tab 里运行。"
     exit 1
   fi
 
-  # Explicit session name / 指定 session 名
+  # Explicit session name
   if [ -n "$TARGET" ]; then
     re_ensure_server
     exec "$TMUX_BIN" attach -t "$TARGET"
@@ -258,36 +229,41 @@ cmd_restore() {
     if [ -n "$first" ]; then
       exec "$TMUX_BIN" attach -t "$first"
     fi
-    echo "Every session already has a client attached / 所有 session 都已有人连接:"
+    say "Every session already has a client attached:" "所有 session 都已有人连接:"
     "$TMUX_BIN" list-sessions
-    echo "To mirror one anyway / 如需镜像查看:  tmux attach -t <name>"
+    say "To mirror one anyway:  tmux attach -t <name>" "如需镜像查看:  tmux attach -t <名字>"
     exit 0
   fi
 
-  # --pick: list all sessions, let the user choose / 列出并选择
+  # --pick: list all sessions, let the user choose
   if [ "$MODE" = pick ]; then
     re_ensure_server
     local names=() flags=() i sel tok
     while read -r n a; do names+=("$n"); flags+=("$a"); done < <(
       "$TMUX_BIN" list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null)
     if [ "${#names[@]}" -eq 0 ]; then
-      err "No tmux sessions found / 没有任何 tmux session"; exit 1
+      sae "No tmux sessions found" "没有任何 tmux session"; exit 1
     fi
-    echo "Restorable tmux sessions / 可接回的 tmux session:"
+    say "Restorable tmux sessions:" "可接回的 tmux session:"
     i=0
     while [ "$i" -lt "${#names[@]}" ]; do
       local st wins
-      if [ "${flags[$i]}" = 0 ]; then st="detached/待接回"; else st="attached/已连接"; fi
+      if [ "${flags[$i]}" = 0 ]; then
+        [ "$UI_LANG" = zh ] && st="待接回" || st="detached"
+      else
+        [ "$UI_LANG" = zh ] && st="已连接" || st="attached"
+      fi
       wins="$("$TMUX_BIN" list-windows -t "${names[$i]}" -F '#W' 2>/dev/null | paste -s -d, - || true)"
       printf '  %2d) %-24s [%s]  windows: %s\n' "$((i+1))" "${names[$i]}" "$st" "$wins"
       i=$((i+1))
     done
-    printf 'Pick / 选择(编号,空格分隔;回车=全部待接回;q=取消)> '
+    pn "Pick (numbers, space-separated; Enter = all detached; q = cancel) > " \
+       "选择(编号,空格分隔;回车=全部待接回;q=取消)> "
     IFS= read -r sel || sel=q
 
     local chosen=()
     case "$sel" in
-      q|Q) echo "Cancelled / 已取消"; exit 0;;
+      q|Q) say "Cancelled" "已取消"; exit 0;;
       ""|a|all)
         i=0
         while [ "$i" -lt "${#names[@]}" ]; do
@@ -297,17 +273,17 @@ cmd_restore() {
       *)
         for tok in $(printf '%s' "$sel" | tr ',' ' '); do
           case "$tok" in (''|*[!0-9]*)
-            err "Invalid choice / 无效选择: $tok"; exit 1;;
+            sae "Invalid choice: $tok" "无效选择: $tok"; exit 1;;
           esac
           if [ "$tok" -lt 1 ] || [ "$tok" -gt "${#names[@]}" ]; then
-            err "Out of range / 超出范围: $tok"; exit 1
+            sae "Out of range: $tok" "超出范围: $tok"; exit 1
           fi
           chosen+=("${names[$((tok-1))]}")
         done;;
     esac
 
     if [ "${#chosen[@]}" -eq 0 ]; then
-      echo "Nothing to restore — every session is attached / 没有待接回的 session(都已连接)"
+      say "Nothing to restore — every session is attached" "没有待接回的 session(都已连接)"
       exit 0
     fi
     re_restore_sessions "${chosen[@]}"
@@ -319,9 +295,11 @@ cmd_restore() {
   local sessions=()
   while IFS= read -r s; do sessions+=("$s"); done < <(re_unattached)
   if [ "${#sessions[@]}" -eq 0 ]; then
-    echo "Every session already has a client attached — nothing to do / 所有 session 都已有人连接,无需操作:"
+    say "Every session already has a client attached — nothing to do:" \
+        "所有 session 都已有人连接,无需操作:"
     "$TMUX_BIN" list-sessions
-    echo "Tip: pick one to mirror with / 如需镜像查看可用:  gtmux restore --pick"
+    say "Tip: pick one to mirror with:  gtmux restore --pick" \
+        "提示: 如需镜像查看可用:  gtmux restore --pick"
     exit 0
   fi
   re_restore_sessions "${sessions[@]}"
@@ -329,27 +307,20 @@ cmd_restore() {
 
 # ════════════════════════════════════════════════════════════════════════════
 # focus — jump to a session's Ghostty tab; with a pane id, to that exact pane
-# focus —— 跳到某 session 的 Ghostty tab;给 pane id 则精确到那个 pane
 # ════════════════════════════════════════════════════════════════════════════
-# Relies on tmux set-titles-string '#S — #W': the tab title is "session — window",
-# so we match a tab whose title is exactly <session> or starts with "<session> — ".
-# If the argument is a tmux pane id (e.g. %12), first select that pane's window +
-# pane inside its session (so the session displays that exact pane), then bring
-# its Ghostty tab forward — i.e. one jump lands on the precise pane the agent ran in.
-# 依赖 tmux set-titles-string '#S — #W':tab 标题是 "session — window",匹配标题
-# 等于 <session> 或以 "<session> — " 开头的 tab。若参数是 tmux pane id(如 %12),先在它
-# 所属 session 里 select 那个 window+pane(让 session 显示该 pane),再把对应 Ghostty tab
-# 切前台 —— 一跳就落到 agent 当时所在的那个确切 pane。
+# Relies on tmux set-titles-string '#S — #W' (tab title = "session — window"):
+# match a tab whose title is <session> or starts with "<session> — ". If the arg
+# is a tmux pane id (e.g. %12), first select that window+pane inside the session
+# (so it displays that pane), then bring the Ghostty tab forward.
 cmd_focus() {
   local target="${1:-}"
   case "$target" in
     -h|--help) usage; return 0;;
-    "") err "usage: gtmux focus <session|pane-id>   (jump to that tab / exact pane)"
-        err "用法: gtmux focus <session|pane-id>   (跳到那个 tab / 确切 pane)"; return 2;;
+    "") sae "usage: gtmux focus <session|pane-id>   (jump to that tab / exact pane)" \
+            "用法: gtmux focus <session|pane-id>   (跳到那个 tab / 确切 pane)"; return 2;;
   esac
 
   # Pane id (%N): select its window + pane in tmux, then focus the session's tab.
-  # pane id(%N):在 tmux 里选中它的 window+pane,再聚焦该 session 的 tab。
   case "$target" in
     %[0-9]*)
       if [ -n "$TMUX_BIN" ] && "$TMUX_BIN" display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1; then
@@ -360,16 +331,15 @@ cmd_focus() {
         "$TMUX_BIN" select-pane -t "$target" 2>/dev/null
         target="$_sess"   # fall through to focus this session's Ghostty tab
       else
-        err "Pane $target no longer exists / pane $target 已不存在"
+        sae "Pane $target no longer exists" "pane $target 已不存在"
         return 1
       fi
       ;;
   esac
-  [ -z "$target" ] && { err "could not resolve a session / 无法解析 session"; return 1; }
+  [ -z "$target" ] && { sae "could not resolve a session" "无法解析 session"; return 1; }
 
   local osa res
   # The separator must match set-titles-string exactly: space, em-dash, space.
-  # 分隔符必须与 set-titles-string 完全一致:空格 + em-dash + 空格。
   osa='tell application "Ghostty"
   repeat with w in windows
     repeat with t in tabs of w
@@ -389,21 +359,99 @@ end tell'
     return 0
   fi
   if [ -z "$res" ]; then
-    err "AppleScript failed. Needs Ghostty 1.3+ and Automation permission"
-    err "(System Settings → Privacy & Security → Automation → allow controlling Ghostty)."
-    err "AppleScript 执行失败:需要 Ghostty 1.3+ 及自动化权限。"
+    sae "AppleScript failed. Needs Ghostty 1.3+ and Automation permission" \
+        "AppleScript 执行失败:需要 Ghostty 1.3+ 及自动化权限。"
+    sae "(System Settings → Privacy & Security → Automation → allow controlling Ghostty)." \
+        "(系统设置 → 隐私与安全性 → 自动化 → 允许控制 Ghostty)。"
     return 1
   fi
-  err "No Ghostty tab is showing session '$target' (it may be detached)."
-  err "没有显示 session '$target' 的 Ghostty tab(可能尚未接回)。"
-  err "Restore it with / 接回它:  gtmux restore $target"
+  sae "No Ghostty tab is showing session '$target' (it may be detached)." \
+      "没有显示 session '$target' 的 Ghostty tab(可能尚未接回)。"
+  sae "Restore it with:  gtmux restore $target" "接回它:  gtmux restore $target"
   return 1
 }
 
 # ════════════════════════════════════════════════════════════════════════════
 usage() {
-  awk 'NR>1 { if (/^#/) sub(/^# ?/,"") ; else exit ; print }' "$0"
+  if [ "$UI_LANG" = zh ]; then
+    cat <<'EOF'
+gtmux —— 用 tmux 状态层驱动 Ghostty ↔ tmux 工作区。一个命令,三个动词。
+
+用法:
+  gtmux [--lang=en|zh] <命令> [选项]
+
+命令:
+  overview [--popup]      session / window / pane 汇总(不带命令时的默认)
+                          --popup 就是 prefix+g 弹的那个弹窗
+  restore                 每个 session 一个 Ghostty tab,全部接回
+    restore --pick|-p     列出来选(编号 / 回车=全部 / q=取消)
+    restore <名字>         按名字把当前 tab 接回指定 session
+    restore --one         只把当前 tab 接回下一个无人连接的 session
+    restore --dry-run     只打印将要做什么,不实际执行
+  focus <名字|pane-id>    跳到该 session 的 Ghostty tab;给 tmux pane id(%N)
+                          则精确落到那个 window+pane
+  -h, --help              显示本帮助
+
+选项:
+  --lang=en|zh   输出语言(默认 en;也可用 GTMUX_LANG 环境变量设默认)
+
+说明:
+  - focus 读 tmux set-titles('#S — #W')写在 tab 标题上的名字,所以请保持 set-titles 开启。
+  - restore/focus 通过 AppleScript 控制 Ghostty:首次运行会弹自动化授权
+    (「想要控制 Ghostty」)—— 点允许。
+  - 电脑重启后,restore 会启动 tmux 并等 tmux-continuum 恢复最近一次自动存档
+    (布局/目录/屏幕文本 —— 不含正在运行的程序)。
+  - restore 不支持带空格的 session 名。
+
+由 terminal/install.sh 安装到 ~/.local/bin/gtmux。
+EOF
+  else
+    cat <<'EOF'
+gtmux — drive your Ghostty <-> tmux workspace from the tmux state layer.
+One command, three verbs.
+
+Usage:
+  gtmux [--lang=en|zh] <command> [options]
+
+Commands:
+  overview [--popup]      sessions / windows / panes summary (default if no command)
+                          --popup is what prefix+g opens
+  restore                 one Ghostty tab per session, attach all
+    restore --pick|-p     list & choose (numbers / Enter=all / q=cancel)
+    restore <name>        attach that session by name in THIS tab
+    restore --one         attach the next unattached session in THIS tab
+    restore --dry-run     print what would happen, change nothing
+  focus <name|pane-id>    jump to that session's Ghostty tab; a tmux pane id
+                          (%N) lands on that exact window+pane
+  -h, --help              show this help
+
+Options:
+  --lang=en|zh   output language (default en; or set GTMUX_LANG)
+
+Notes:
+  - focus reads tmux set-titles ('#S — #W') tab titles; keep set-titles on.
+  - restore/focus drive Ghostty via AppleScript: the first run asks for
+    Automation permission ("wants to control Ghostty") — allow it.
+  - After a reboot, restore starts tmux and waits for tmux-continuum to restore
+    the last autosave (layout/dirs/screen text — not running programs).
+  - Session names with spaces aren't supported by restore.
+
+Installed to ~/.local/bin/gtmux by terminal/install.sh.
+EOF
+  fi
 }
+
+# ── parse global --lang, strip it from args / 解析全局 --lang 并从参数中剔除 ──
+_args=()
+for _a in "$@"; do
+  case "$_a" in
+    --lang=zh) UI_LANG=zh;;
+    --lang=en) UI_LANG=en;;
+    --lang=*)  sae "gtmux: unknown --lang value (use en|zh)" "gtmux: 无效的 --lang(可用 en|zh)"; exit 2;;
+    *)         _args+=("$_a");;
+  esac
+done
+if [ "${#_args[@]}" -gt 0 ]; then set -- "${_args[@]}"; else set --; fi
 
 # ── dispatch / 分发 ─────────────────────────────────────────────────────────
 sub="${1:-overview}"
@@ -412,7 +460,7 @@ case "$sub" in
   restore|re)         shift; cmd_restore "$@";;
   focus|fo)           shift; cmd_focus "${1:-}";;
   -h|--help|help)     usage;;
-  *)                  err "gtmux: unknown command '$sub' (try: overview | restore | focus | --help)"
-                      err "gtmux: 未知命令 '$sub'(可用:overview | restore | focus | --help)"
+  *)                  sae "gtmux: unknown command '$sub' (try: overview | restore | focus | --help)" \
+                          "gtmux: 未知命令 '$sub'(可用:overview | restore | focus | --help)"
                       exit 2;;
 esac
