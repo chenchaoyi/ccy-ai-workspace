@@ -328,20 +328,44 @@ cmd_restore() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════
-# focus — bring the Ghostty tab showing <session> to the front
-# focus —— 把显示 <session> 的 Ghostty tab 拉到最前
+# focus — jump to a session's Ghostty tab; with a pane id, to that exact pane
+# focus —— 跳到某 session 的 Ghostty tab;给 pane id 则精确到那个 pane
 # ════════════════════════════════════════════════════════════════════════════
 # Relies on tmux set-titles-string '#S — #W': the tab title is "session — window",
 # so we match a tab whose title is exactly <session> or starts with "<session> — ".
-# 依赖 tmux set-titles-string '#S — #W':tab 标题是 "session — window",
-# 因此匹配标题正好等于 <session> 或以 "<session> — " 开头的那个 tab。
+# If the argument is a tmux pane id (e.g. %12), first select that pane's window +
+# pane inside its session (so the session displays that exact pane), then bring
+# its Ghostty tab forward — i.e. one jump lands on the precise pane the agent ran in.
+# 依赖 tmux set-titles-string '#S — #W':tab 标题是 "session — window",匹配标题
+# 等于 <session> 或以 "<session> — " 开头的 tab。若参数是 tmux pane id(如 %12),先在它
+# 所属 session 里 select 那个 window+pane(让 session 显示该 pane),再把对应 Ghostty tab
+# 切前台 —— 一跳就落到 agent 当时所在的那个确切 pane。
 cmd_focus() {
   local target="${1:-}"
   case "$target" in
     -h|--help) usage; return 0;;
-    "") err "usage: gtmux focus <session>   (jump to that session's Ghostty tab)"
-        err "用法: gtmux focus <session>   (跳到那个 session 的 Ghostty tab)"; return 2;;
+    "") err "usage: gtmux focus <session|pane-id>   (jump to that tab / exact pane)"
+        err "用法: gtmux focus <session|pane-id>   (跳到那个 tab / 确切 pane)"; return 2;;
   esac
+
+  # Pane id (%N): select its window + pane in tmux, then focus the session's tab.
+  # pane id(%N):在 tmux 里选中它的 window+pane,再聚焦该 session 的 tab。
+  case "$target" in
+    %[0-9]*)
+      if [ -n "$TMUX_BIN" ] && "$TMUX_BIN" display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1; then
+        local _sess _win
+        _sess="$("$TMUX_BIN" display-message -p -t "$target" '#{session_name}' 2>/dev/null)"
+        _win="$("$TMUX_BIN" display-message -p -t "$target" '#{window_id}' 2>/dev/null)"
+        [ -n "$_win" ] && "$TMUX_BIN" select-window -t "$_win" 2>/dev/null
+        "$TMUX_BIN" select-pane -t "$target" 2>/dev/null
+        target="$_sess"   # fall through to focus this session's Ghostty tab
+      else
+        err "Pane $target no longer exists / pane $target 已不存在"
+        return 1
+      fi
+      ;;
+  esac
+  [ -z "$target" ] && { err "could not resolve a session / 无法解析 session"; return 1; }
 
   local osa res
   # The separator must match set-titles-string exactly: space, em-dash, space.

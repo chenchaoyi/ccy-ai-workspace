@@ -21,7 +21,7 @@ terminal/
 ├── scripts/
 │   ├── gtmux            Ghostty↔tmux 工作区的统一命令行:
 │   │                      restore(一键接回)· overview(前缀+g 弹窗)· focus(跳到对应 tab)
-│   └── claude-notify    Claude Code 钩子:agent 完成弹通知,点击→ gtmux focus
+│   └── claude-notify    Claude Code 钩子:agent 完成弹通知,点击→ 确切 pane(install.sh 生成 GtmuxFocus.app)
 ├── shell/
 │   └── ghostty-cwd.bash macOS bash 3.2 的目录上报(让新窗口继承工作目录)
 └── docs/
@@ -197,19 +197,25 @@ gtmux focus shop         # 把显示 session "shop" 的 Ghostty tab 拉到最前
 > (比如 peon-ping 的 `terminal_tab_title`),把那个关掉,标题才会保持
 > `focus` 匹配所依赖的 "session — window" 格式。
 
-## agent 完成通知,点击直达 tab(Claude Code)
+## agent 完成通知,点击直达"确切 pane"(Claude Code)
 
 不用 tmux 时,Claude Code 的 agent 跑完,Ghostty 会弹原生通知,点一下就跳到那个
-tab。**在 tmux 下这条路是断的** —— tmux 会丢掉那条裸通知转义序列,而且后台/detached
-的 session 根本没有 tab 可呈现。`claude-notify`(由 `install.sh` 安装的 Claude Code
-钩子)把它补回来,**用不用 peon-ping 都能工作**:
+tab。**在 tmux 下这条路是断的** —— tmux 会丢掉那条裸通知转义序列。`claude-notify`
+(由 `install.sh` 安装的 Claude Code 钩子)把它补回来,而且**落到 agent 当时所在的
+那个确切 pane**,**用不用 peon-ping 都行**:
 
 - **任意** tmux session 里 agent 完成都会弹桌面通知 —— 包括你没在看的那些 ——
   并且**你正盯着该 session 的 Ghostty tab 时保持安静**。
-- 装了 **`terminal-notifier`** 时通知**可点击 —— 点击会跑 `gtmux focus <session>`**
-  落到对应 tab(安装器默认帮你 `brew install`,回车即装,按 n 跳过)。没装也有
-  可靠的原生通知,只是不可点(macOS 没有零依赖的可点击通知);文案里带 session
-  名,你可自己 `gtmux focus <名字>` 跳过去。
+- **点击通知 → 直接跳到那个确切 pane**:在 tmux 里选中它的 window+pane,再把
+  Ghostty tab 切前台。
+- **`-activate` 诀窍**:新版 macOS(26.x)上通知点击只能"激活某个 app",点击跑命令
+  (`-execute`)已静默失效。所以点击去 `-activate` 一个极小的中转 app
+  **`GtmuxFocus.app`**(两个文件,由 `install.sh` 生成并注册到 Launch Services),它读
+  `~/.local/share/gtmux/last-finished` 里记录的 pane id,跑 `gtmux focus <pane>`。
+  首次点击会弹「GtmuxFocus 想要控制 Ghostty」—— 允许一次即可。
+- **`前缀 + J`** 用键盘做同样的跳转(你本来就在 Ghostty 里时更顺手,不用碰通知)。
+- 通知器是 **`terminal-notifier`**(安装器默认帮你 `brew install`,回车即装)。没装也有
+  可靠的原生通知,只是不可点。
 - 自包含 —— 不依赖任何插件。检测到 peon-ping 时,安装器会**提示你关掉 peon 自己的
   桌面通知(和 `terminal_tab_title`)**,免得双弹或跟 `set-titles` 抢标题。
 
@@ -241,7 +247,7 @@ tmux.conf 已开 `allow-passthrough on`),常驻 tmux 时 Ghostty 也能拿到真
 | tab 命名 | 名字起在 tmux 的 session/window 上,**`set-titles` 自动映射到 Ghostty tab 标题** | 名字活在状态层 —— quit/重启不丢,`gtmux restore` 接回后自动正确,零手动命名 |
 | 工作区命令行 | **一个 `gtmux`**:`restore`(接回)·`overview`(前缀+g 弹窗)·`focus <名字>`(跳到 tab) | 一个命令三个动词;`focus` 读 `set-titles` 写的标题精确落到对应 tab |
 | 现在跑着什么? | **前缀+g** session 概览弹窗(shell 里也可 `gtmux overview`) | 一眼看清 session/window/pane 数量与明细 |
-| agent 完成提醒 | **`claude-notify`** 钩子:完成弹通知,**点击→ `gtmux focus`** | 补回 tmux 下被掐断的"点击直达 tab"通知;在看时不打扰;不依赖 peon |
+| agent 完成提醒 | **`claude-notify`** 钩子:完成弹通知,**点击→ 确切 pane**(靠 `GtmuxFocus.app` + `-activate`);也可 `前缀+J` | 补回 tmux 下被掐断的"点击直达"通知,精确落到 agent 所在 pane;在看时不打扰;不依赖 peon |
 | 忘了按键? | **前缀+G** 速查表弹窗;前缀+? 全量键位;前缀+/ 再按某键=解释它 | 不离开 tmux 随手查 |
 | 并行 agent | 一项目一 session,任务分 window | 见 docs/04 |
 

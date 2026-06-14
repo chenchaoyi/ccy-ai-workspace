@@ -5,16 +5,19 @@
 # claude-notify —— Claude Code 钩子:agent 完成时弹桌面通知,点击经 `gtmux focus`
 # 跳到它所在的 Ghostty tab。
 #
-# General & self-contained: does NOT depend on peon-ping or any plugin. Picks a
-# notifier automatically — terminal-notifier if installed (native + CLICKABLE:
-# the click runs `gtmux focus`), otherwise a native osascript banner that is
-# reliable but NOT clickable (macOS has no zero-dependency clickable
-# notification — install terminal-notifier for click-through). Suppresses the
-# notification when you are already looking at that session's Ghostty tab.
-# 通用、自包含:不依赖 peon-ping 或任何插件。自动选通知器 —— 装了 terminal-notifier
-# 就用它(原生 + 可点击,点击跑 `gtmux focus`);否则用原生 osascript 通知:可靠但
-# 【不可点击】(macOS 没有零依赖的可点击通知,想点击直达就装 terminal-notifier)。
-# 当你正看着该 session 的 Ghostty tab 时不弹。
+# General & self-contained: does NOT depend on peon-ping or any plugin. With
+# terminal-notifier installed, CLICKING the notification jumps to the exact
+# Ghostty tab — via a tiny helper app (GtmuxFocus) that the click -activates,
+# which runs `gtmux focus` on the just-finished session (see the -activate trick
+# below). It records that session to ~/.local/share/gtmux/last-finished, which
+# the helper app reads and which `prefix+J` can also use as a keyboard shortcut.
+# Without terminal-notifier, a plain osascript banner (not clickable). Suppresses
+# the notification when you are already looking at that session's Ghostty tab.
+# 通用、自包含:不依赖 peon-ping 或任何插件。装了 terminal-notifier 时,【点击通知就跳到
+# 具体 Ghostty tab】—— 靠点击 -activate 一个极小的中转 app(GtmuxFocus),它对刚完成的
+# session 跑 `gtmux focus`(见下方 -activate 诀窍)。它把该 session 记到
+# ~/.local/share/gtmux/last-finished,中转 app 读它,`prefix+J` 也能用它做键盘快捷跳转。
+# 没装 terminal-notifier 时退回普通 osascript 通知(不可点)。正看着该 tab 时不弹。
 #
 # Wire it (done by install.sh) into ~/.claude/settings.json on Stop/Notification:
 #   { "type": "command", "command": "~/.local/bin/claude-notify", "async": true }
@@ -92,26 +95,42 @@ log_dbg "decision=NOTIFY (front_sel_match=$front_sel_match)"
 # stderr 写进日志(而非 /dev/null),便于看报错。
 NERR=/dev/null
 [ -f "$HOME/.claude/.claude-notify-debug" ] && NERR="$HOME/.claude/claude-notify.log"
+# Record the EXACT pane the agent ran in (this hook runs inside it, so $TMUX_PANE
+# is that pane's global id). The helper app and prefix+J pass it to `gtmux focus`,
+# which selects that window+pane in tmux and brings the Ghostty tab forward — so
+# the jump lands on the precise pane, not just the session. Falls back to the
+# session name if somehow not in tmux.
+# 记下 agent 所在的【确切 pane】(本钩子就跑在它里面,$TMUX_PANE 即该 pane 的全局 id)。
+# 中转 app 和 prefix+J 把它交给 `gtmux focus`:它在 tmux 里选中那个 window+pane 再把
+# Ghostty tab 切前台 —— 一跳落到确切 pane,而非只到 session。不在 tmux 时回退到 session 名。
+_target="${TMUX_PANE:-$SESSION}"
+if [ -n "$_target" ]; then
+  mkdir -p "$HOME/.local/share/gtmux" 2>/dev/null
+  printf '%s' "$_target" > "$HOME/.local/share/gtmux/last-finished" 2>/dev/null || true
+fi
+
 if command -v terminal-notifier >/dev/null 2>&1; then
-  # Preferred: native + CLICKABLE. Layout: title "Claude Code", subtitle = the
-  # session, message + click-to-open. -execute runs via /bin/sh -c on click;
-  # quote the (possibly spaced) session name so `gtmux focus` gets one arg.
-  # A Claude icon shows on the right via -contentImage IF cached (install.sh
-  # generates ~/.local/share/gtmux/notify-icon.png from Claude.app). The LEFT
-  # app icon can't be changed (terminal-notifier limitation on modern macOS);
-  # -appIcon is ignored and -sender would break click-to-focus.
-  # 首选:原生 + 可点击。布局:标题 "Claude Code"、副标题 = session、正文 + 点击打开。
-  # 点击时 -execute 经 /bin/sh -c 执行;给(可能带空格的)session 名加引号。右侧 Claude
-  # 小图标用 -contentImage(install.sh 从 Claude.app 生成 ~/.local/share/gtmux/notify-icon.png,
-  # 有才加)。左侧主图标改不了(terminal-notifier 在新版 macOS 的限制;-appIcon 被忽略,
-  # -sender 会毁掉点击跳转)。
-  log_dbg "notifier=terminal-notifier (clickable)"
+  # Native + clickable → jumps to the exact tab. Trick: on modern macOS (26.x)
+  # -execute (run a command on click) is silently broken, but -activate (bring an
+  # app to front) works. So the click -activates a tiny helper app (GtmuxFocus,
+  # installed by install.sh) whose only job is to read last-finished and run
+  # `gtmux focus` — i.e. we smuggle "run a command on click" through -activate.
+  # First click prompts "GtmuxFocus wants to control Ghostty" — allow once.
+  # A Claude icon shows on the right via -contentImage if cached; the LEFT app
+  # icon can't be changed (terminal-notifier limitation; -appIcon is ignored).
+  # 原生 + 可点击 → 直接跳到具体 tab。诀窍:新版 macOS(26.x)上 -execute(点击跑命令)失效,
+  # 但 -activate(把某 app 切前台)能用。于是点击去 -activate 一个极小的中转 app(GtmuxFocus,
+  # 由 install.sh 安装),它读 last-finished 跑 `gtmux focus` —— 等于借 -activate 实现了
+  # "点击跑命令"。首次点击会弹"GtmuxFocus 想要控制 Ghostty",允许一次即可。
+  # 右侧 Claude 小图用 -contentImage(有缓存才加);左侧主图标改不了(terminal-notifier 限制)。
+  ACT_BUNDLE="${CLAUDE_NOTIFY_ACTIVATE_BUNDLE:-com.gtmux.focus}"
   ICON="${CLAUDE_NOTIFY_ICON:-$HOME/.local/share/gtmux/notify-icon.png}"; [ -f "$ICON" ] || ICON=""
-  tn=(terminal-notifier -title "Claude Code" -sound default)
+  log_dbg "notifier=terminal-notifier (-activate $ACT_BUNDLE)"
+  tn=(terminal-notifier -title "Claude Code" -sound default -activate "$ACT_BUNDLE")
   [ -n "$ICON" ] && tn+=(-contentImage "$ICON")
   if [ -n "$SESSION" ]; then
     tn+=(-subtitle "$SESSION" -message "Agent finished — click to open" \
-         -group "claude-notify-$SESSION" -execute "$GTMUX focus \"$SESSION\"")
+         -group "claude-notify-$SESSION")
   else
     tn+=(-message "Agent finished")
   fi

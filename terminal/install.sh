@@ -489,6 +489,44 @@ elif confirm "Enable 'agent finished' desktop notifications? [y/N] " \
       say "✓ cached Claude notification icon" "✓ 已缓存 Claude 通知图标"
     fi
   fi
+  # GtmuxFocus.app — the click target. On modern macOS only -activate (bring an
+  # app forward) works on a notification click, not -execute (run a command). So
+  # the notification -activates this 2-file app bundle, whose executable reads
+  # last-finished and runs `gtmux focus` — that's how one click reaches the exact
+  # tab. Registered with Launch Services so -activate resolves it by bundle id.
+  # GtmuxFocus.app —— 点击的落点。新版 macOS 上通知点击只有 -activate(把某 app 切前台)能用,
+  # -execute(跑命令)不行。于是通知 -activate 这个两文件的 app,它读 last-finished 跑
+  # `gtmux focus` —— 一键就到具体 tab。用 Launch Services 注册,-activate 才能按 bundle id 找到。
+  GFAPP="$HOME/Applications/GtmuxFocus.app"
+  mkdir -p "$GFAPP/Contents/MacOS"
+  cat > "$GFAPP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key><string>com.gtmux.focus</string>
+  <key>CFBundleName</key><string>GtmuxFocus</string>
+  <key>CFBundleExecutable</key><string>run</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>LSUIElement</key><true/>
+</dict>
+</plist>
+PLIST
+  cat > "$GFAPP/Contents/MacOS/run" <<'RUNSH'
+#!/bin/bash
+# Click target for claude-notify: jump to the session that most recently finished.
+f=$(cat "$HOME/.local/share/gtmux/last-finished" 2>/dev/null)
+[ -n "$f" ] && "$HOME/.local/bin/gtmux" focus "$f"
+RUNSH
+  chmod +x "$GFAPP/Contents/MacOS/run"
+  _lsreg="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  [ -x "$_lsreg" ] && "$_lsreg" -f "$GFAPP" 2>/dev/null
+  printf 'rm -rf %q && echo "  %s: %s"\n' "$GFAPP" "$R_REMOVED" "$GFAPP" >> "$ROLLBACK"
+  say "✓ installed GtmuxFocus.app (notification click → jump to tab)" \
+      "✓ 已安装 GtmuxFocus.app(通知点击 → 跳到对应 tab)"
+  say "  first click prompts 'GtmuxFocus wants to control Ghostty' — allow it once" \
+      "  首次点击会弹「GtmuxFocus 想要控制 Ghostty」,允许一次即可"
 
   # 7b) Notifier: terminal-notifier makes the notification CLICKABLE (click →
   # gtmux focus). Without it the hook still notifies, just not clickable, so
