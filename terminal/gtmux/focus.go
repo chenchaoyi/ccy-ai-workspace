@@ -6,6 +6,22 @@ import (
 
 var paneIDRe = regexp.MustCompile(`^%[0-9]+`)
 
+// jumpPane selects a pane's window+pane in tmux and brings its Ghostty tab
+// forward (no output). Used by the watch TUI on Enter.
+func jumpPane(paneID string) {
+	if tmuxBin == "" || display(paneID, "#{pane_id}") == "" {
+		return
+	}
+	sess := display(paneID, "#{session_name}")
+	if win := display(paneID, "#{window_id}"); win != "" {
+		tmuxOK("select-window", "-t", win)
+	}
+	tmuxOK("select-pane", "-t", paneID)
+	if sess != "" {
+		ghosttyFocusTab(sess)
+	}
+}
+
 // cmdFocus implements `gtmux focus <session|pane-id>`.
 // A tmux pane id (%N) first selects that window+pane inside its session (so the
 // session displays that exact pane), then its Ghostty tab is brought forward.

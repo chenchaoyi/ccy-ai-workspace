@@ -162,6 +162,11 @@ who just finished. Each row: **status** (`⠿ working` / `✳ idle` / `● runni
 the **agent** (Claude Code, Codex, Gemini, aider, …), location, the task, and the
 **pane id** — working agents sorted first, with a status breakdown in the header.
 
+Run **`gtmux agents --watch`** for a live, auto-refreshing dashboard you can keep
+open in a pane: it polls every ~1.5s, **↑/↓** select a row, **Enter** jumps to
+that pane, **r** refreshes, **q** quits. Agents that finish while you watch
+(working → idle) get flagged `✓ done` so you notice completions in real time.
+
 Detection is **not Claude-only**:
 - **Status** comes from the pane title the agent sets itself. A leading braille
   spinner (`⠋⠙⠹…`, what most agent TUIs animate) means **working**; Claude Code's

@@ -55,6 +55,7 @@ type agentPane struct {
 	task     string // title with the status glyph stripped
 	status   string // "working" | "idle" | "running"
 	activity bool
+	latest   bool // the most-recently-finished pane (claude-notify last-finished)
 }
 
 // isBrailleSpinner reports whether r is in the braille block (U+2800–U+28FF),
@@ -146,29 +147,17 @@ func classifyAgent(title, cmd string, profiles []agentProfile) (isAgent bool, ag
 	return true, agent, status, task
 }
 
-// cmdAgents implements `gtmux agents` — coding agents across all tmux panes.
-func cmdAgents(args []string) int {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			usage()
-			return 0
-		}
-	}
-	if !tmuxServerUp() {
-		say("No tmux server running", "没有运行中的 tmux server")
-		return 1
-	}
+// gatherAgents polls every pane and returns the LIVE coding agents (working
+// first, then by location) and how many are working. Shared by the static
+// `gtmux agents` and the `--watch` TUI.
+func gatherAgents() (panes []agentPane, nWorking int) {
 	profiles := loadProfiles()
-
 	lastFinished := ""
 	if b, err := os.ReadFile(os.Getenv("HOME") + "/.local/share/gtmux/last-finished"); err == nil {
 		lastFinished = strings.TrimSpace(string(b))
 	}
-
 	fields := "#{pane_id}\t#{session_name}\t#{window_index}\t#{pane_index}\t" +
 		"#{pane_title}\t#{pane_current_command}\t#{window_activity_flag}"
-	var panes []agentPane
-	nWorking := 0
 	for _, line := range tmuxLines("list-panes", "-a", "-F", fields) {
 		f := strings.SplitN(line, "\t", 7)
 		if len(f) < 7 {
@@ -188,10 +177,9 @@ func cmdAgents(args []string) int {
 			task:     task,
 			status:   status,
 			activity: f[6] == "1",
+			latest:   f[0] == lastFinished && status != "working",
 		})
 	}
-
-	// Working agents first (most relevant), then by location for stability.
 	sort.SliceStable(panes, func(i, j int) bool {
 		wi, wj := panes[i].status == "working", panes[j].status == "working"
 		if wi != wj {
@@ -199,34 +187,57 @@ func cmdAgents(args []string) int {
 		}
 		return panes[i].loc < panes[j].loc
 	})
+	return
+}
 
-	// Header with a status breakdown.
-	head := tr("agents", "agent")
-	summary := pl(len(panes), "agent")
+// agentsSummary renders the header line's "N agents · X working · Y idle".
+func agentsSummary(panes []agentPane, nWorking int) string {
+	s := pl(len(panes), "agent")
 	if len(panes) > 0 {
-		summary += tr(
-			fmt.Sprintf(" · %d working · %d idle", nWorking, len(panes)-nWorking),
+		s += tr(fmt.Sprintf(" · %d working · %d idle", nWorking, len(panes)-nWorking),
 			fmt.Sprintf(" · %d 运行中 · %d 空闲", nWorking, len(panes)-nWorking))
 	}
-	fmt.Printf("%sgtmux %s%s — %s\n\n", cBold, head, cReset, summary)
+	return s
+}
+
+// cmdAgents implements `gtmux agents [--watch]`.
+func cmdAgents(args []string) int {
+	watch := false
+	for _, a := range args {
+		switch a {
+		case "-h", "--help":
+			usage()
+			return 0
+		case "--watch", "-w":
+			watch = true
+		}
+	}
+	if !tmuxServerUp() {
+		say("No tmux server running", "没有运行中的 tmux server")
+		return 1
+	}
+	if watch {
+		return runWatch()
+	}
+
+	panes, nWorking := gatherAgents()
+	fmt.Printf("%sgtmux %s%s — %s\n\n", cBold, tr("agents", "agent"), cReset, agentsSummary(panes, nWorking))
 	if len(panes) == 0 {
 		say("No coding-agent panes found.", "没有发现 coding-agent 的 pane。")
 		return 0
 	}
-
-	noTask := tr("—", "—")
 	for _, p := range panes {
 		glyph, color, label := statusStyle(p.status)
 		task := p.task
 		if task == "" {
-			task = cDim + noTask + cReset
+			task = cDim + "—" + cReset
 		}
 		dot := ""
 		if p.activity {
 			dot = cYellow + " •" + cReset
 		}
 		done := ""
-		if p.paneID == lastFinished && p.status != "working" {
+		if p.latest {
 			done = cYellow + tr("  ✓ latest", "  ✓ 最近完成") + cReset
 		}
 		fmt.Printf("%s%s%s %s%s%s %s%s%s %s%s%s %s%s%s%s\n",
@@ -236,7 +247,6 @@ func cmdAgents(args []string) int {
 			cBold, padRight(p.loc, 22), cReset,
 			task, dot, cDim+" "+p.paneID+cReset, done)
 	}
-
 	fmt.Printf("\n%s%s%s\n", cDim,
 		tr("jump: gtmux focus <pane>   (e.g. gtmux focus "+panes[0].paneID+")",
 			"跳转: gtmux focus <pane>   (例如 gtmux focus "+panes[0].paneID+")"), cReset)

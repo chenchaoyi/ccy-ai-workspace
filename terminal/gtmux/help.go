@@ -10,8 +10,9 @@ Usage:
 Commands:
   overview [--popup]      sessions / windows / panes summary (default if no command)
                           --popup is what prefix+g opens
-  agents                  coding agents across your panes: working / idle, where,
-                          and the pane id to jump to
+  agents [--watch]        coding agents across your panes: working / idle, where,
+                          and the pane id to jump to. --watch is a live, scrollable
+                          dashboard (↑/↓ select · enter jump · r refresh · q quit)
   restore                 one Ghostty tab per session, attach all
     restore --pick|-p     list & choose (numbers / Enter=all / q=cancel)
     restore <name>        attach that session by name in THIS tab
@@ -40,8 +41,9 @@ const usageZH = `gtmux —— 用 tmux 状态层驱动 Ghostty ↔ tmux 工作�
 命令:
   overview [--popup]      session / window / pane 汇总(不带命令时的默认)
                           --popup 就是 prefix+g 弹的那个弹窗
-  agents                  列出各 pane 里的 coding agent:运行中 / 空闲、在哪、
-                          以及可跳转的 pane id
+  agents [--watch]        列出各 pane 里的 coding agent:运行中 / 空闲、在哪、
+                          以及可跳转的 pane id。--watch 是实时面板
+                          (↑/↓ 选择 · enter 跳转 · r 刷新 · q 退出)
   restore                 每个 session 一个 Ghostty tab,全部接回
     restore --pick|-p     列出来选(编号 / 回车=全部 / q=取消)
     restore <名字>         按名字把当前 tab 接回指定 session
