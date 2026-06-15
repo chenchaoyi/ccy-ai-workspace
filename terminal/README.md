@@ -164,11 +164,14 @@ the **agent** (Claude Code, Codex, Gemini, aider, …), location, the task, and 
 **pane id** — sorted by urgency (waiting → working → idle), with a status
 breakdown in the header.
 
-**`⏸ waiting`** means the agent is blocked on **your** input (a permission prompt
-or "your turn") — these sort to the very top so you can see at a glance which
-agent needs you. It's recorded from Claude Code's `Notification` hook by
-`claude-notify`, and cleared when the agent next responds (so it needs the
-notification setup; other agents without that signal won't show `⏸`).
+The three states: **`⠿ working`** (busy — don't bother it), **`⏸ waiting`**
+(blocked on **you** for a permission/approval, mid-task — these sort to the very
+top so you instantly see which agent needs a decision), and **`✳ idle`**
+(finished its turn, your move when you're ready — not urgent). `⏸ waiting` is
+recorded from Claude Code's *permission* `Notification` (via `claude-notify`) and
+cleared when the agent next responds; Claude's idle-timeout nudge does **not**
+mark waiting, so a long-idle session stays `idle`. (Needs claude-notify; other
+agents without that signal never show `⏸`.)
 
 Run **`gtmux agents --watch`** for a live, auto-refreshing dashboard you can keep
 open in a pane — or pop it open anytime with **`prefix + a`** (which closes once

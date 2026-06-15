@@ -26,8 +26,10 @@ Options:
   --lang=en|zh   output language (default en; or set GTMUX_LANG)
 
 Notes:
-  - "agents" reads each agent's pane title; ⏸ waiting (blocked on you) comes from
-    Claude Code's Notification hook via claude-notify, and sorts to the top.
+  - "agents" status: ⠿ working (busy) · ⏸ waiting (blocked on YOU for a
+    permission/approval — sorts to the top) · ✳ idle (finished its turn, your
+    move). waiting needs claude-notify (Claude Code's permission Notification);
+    its idle-timeout nudge does NOT mark waiting, so long-idle stays idle.
   - restore/focus drive Ghostty (1.3+) via AppleScript: the first run asks for
     Automation permission ("wants to control Ghostty") — allow it.
   - After a reboot, restore starts tmux and waits for tmux-continuum to restore
@@ -58,8 +60,9 @@ const usageZH = `用法:
   --lang=en|zh   输出语言(默认 en;也可用 GTMUX_LANG 环境变量设默认)
 
 说明:
-  - "agents" 读各 agent 的 pane 标题;⏸ 等输入(卡在等你)来自 Claude Code 的
-    Notification 钩子(经 claude-notify),会排到最前。
+  - "agents" 状态:⠿ 运行中(忙)· ⏸ 等输入(卡在等你【批准/权限】—— 排最前)·
+    ✳ 空闲(完成一轮,轮到你)。⏸ 需要 claude-notify(Claude Code 的权限
+    Notification);它的空闲提醒【不】标 ⏸,所以久置会停在 idle。
   - restore/focus 通过 AppleScript 控制 Ghostty(1.3+):首次运行会弹自动化授权
     (「想要控制 Ghostty」)—— 点允许。
   - 电脑重启后,restore 会启动 tmux 并等 tmux-continuum 恢复最近一次自动存档

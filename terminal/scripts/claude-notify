@@ -62,14 +62,19 @@ log_dbg "session=[$SESSION] TMUX=[${TMUX:-}] PANE=[${TMUX_PANE:-}] TERM_PROGRAM=
 
 # ── Record state for `gtmux agents` (BEFORE the focus check, so it's correct
 # even when the notification itself is suppressed) ──────────────────────────
-# Parse the hook event: Stop = the agent finished a turn; Notification = it wants
-# your input/permission. $TMUX_PANE is this agent's own pane (the hook runs in it).
+# $TMUX_PANE is this agent's own pane (the hook runs in it).
 #  - last-finished: the pane that most recently pinged → jump target (prefix+J, click)
-#  - waiting/<pane>: this pane is blocked on YOU (Notification); cleared on Stop.
-#    `gtmux agents` shows these as "⏸ waiting".
-# 在【聚焦判断之前】记录状态,这样即使通知被静默,gtmux agents 也准。Stop=完成一轮;
-# Notification=要你输入/授权。waiting/<pane> 标记"在等你",Stop 时清除 → agents 显示 ⏸。
+#  - waiting/<pane>: this pane is BLOCKED ON YOU for a permission/approval →
+#    `gtmux agents` shows "⏸ waiting". Set only on a permission-type Notification,
+#    NOT on Claude's idle-timeout nudge (so a long-idle session stays idle, not
+#    waiting). Cleared on Stop (the agent responded) and when it resumes working.
+# 在【聚焦判断之前】记录状态。waiting/<pane> = 卡在等你【批准/权限】→ agents 显示 ⏸;
+# 只在【权限类】Notification 时标(空闲提醒不标,所以久置会停在 idle 而非 waiting),
+# Stop 时清除。
 EVENT="$(printf '%s' "$_stdin" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+# The Notification message — permission requests mention "permission"/"approve";
+# the idle nudge ("Claude is waiting for your input") does not.
+NMSG="$(printf '%s' "$_stdin" | sed -n 's/.*"message"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 | tr 'A-Z' 'a-z')"
 GTDIR="$HOME/.local/share/gtmux"
 _target="${TMUX_PANE:-$SESSION}"
 if [ -n "$_target" ]; then
@@ -78,11 +83,15 @@ if [ -n "$_target" ]; then
 fi
 if [ -n "${TMUX_PANE:-}" ]; then
   case "$EVENT" in
-    Notification) : > "$GTDIR/waiting/$TMUX_PANE" 2>/dev/null || true;;
-    Stop)         rm -f "$GTDIR/waiting/$TMUX_PANE" 2>/dev/null || true;;
+    Notification)
+      case "$NMSG" in
+        *permission*|*approve*|*approval*|*"wants to"*)
+          : > "$GTDIR/waiting/$TMUX_PANE" 2>/dev/null || true;;
+      esac;;
+    Stop) rm -f "$GTDIR/waiting/$TMUX_PANE" 2>/dev/null || true;;
   esac
 fi
-log_dbg "event=[$EVENT]"
+log_dbg "event=[$EVENT] msg=[$NMSG]"
 
 # ── Suppress when you're already watching this session's Ghostty tab ─────────
 # Inside tmux $TERM_PROGRAM is "tmux", so detect Ghostty via AppleScript, not env.
