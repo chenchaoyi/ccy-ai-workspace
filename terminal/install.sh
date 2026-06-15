@@ -589,7 +589,7 @@ except Exception:
     cfg = {}
 hooks = cfg.setdefault('hooks', {})
 changed = False
-for event in ('Stop', 'Notification'):
+for event in ('Stop', 'Notification', 'UserPromptSubmit'):
     groups = hooks.setdefault(event, [])
     present = any(
         isinstance(h, dict) and h.get('command') == cmd
@@ -606,8 +606,8 @@ print('changed' if changed else 'nochange')
 PY
 )" || merged="error"
   case "$merged" in
-    changed)  say "✓ hook registered in settings.json (Stop + Notification)" \
-                  "✓ 已注册到 settings.json(Stop + Notification)";;
+    changed)  say "✓ hook registered in settings.json (Stop + Notification + UserPromptSubmit)" \
+                  "✓ 已注册到 settings.json(Stop + Notification + UserPromptSubmit)";;
     nochange) say "✓ hook already registered in settings.json" \
                   "✓ settings.json 中已注册,无需改动";;
     *)        say "⚠ could not edit settings.json — add claude-notify to Stop/Notification by hand" \

@@ -19,7 +19,8 @@
 # ~/.local/share/gtmux/last-finished,中转 app 读它,`prefix+J` 也能用它做键盘快捷跳转。
 # 没装 terminal-notifier 时退回普通 osascript 通知(不可点)。正看着该 tab 时不弹。
 #
-# Wire it (done by install.sh) into ~/.claude/settings.json on Stop/Notification:
+# Wire it (done by install.sh) into ~/.claude/settings.json on
+# Stop / Notification / UserPromptSubmit:
 #   { "type": "command", "command": "~/.local/bin/claude-notify", "async": true }
 # 由 install.sh 注册进 ~/.claude/settings.json 的 Stop / Notification 事件。
 #
@@ -60,38 +61,40 @@ fi
 TITLE="${SESSION:-Claude Code}"
 log_dbg "session=[$SESSION] TMUX=[${TMUX:-}] PANE=[${TMUX_PANE:-}] TERM_PROGRAM=[${TERM_PROGRAM:-}]"
 
-# ── Record state for `gtmux agents` (BEFORE the focus check, so it's correct
-# even when the notification itself is suppressed) ──────────────────────────
-# $TMUX_PANE is this agent's own pane (the hook runs in it).
-#  - last-finished: the pane that most recently pinged → jump target (prefix+J, click)
-#  - waiting/<pane>: this pane is BLOCKED ON YOU for a permission/approval →
-#    `gtmux agents` shows "⏸ waiting". Set only on a permission-type Notification,
-#    NOT on Claude's idle-timeout nudge (so a long-idle session stays idle, not
-#    waiting). Cleared on Stop (the agent responded) and when it resumes working.
-# 在【聚焦判断之前】记录状态。waiting/<pane> = 卡在等你【批准/权限】→ agents 显示 ⏸;
-# 只在【权限类】Notification 时标(空闲提醒不标,所以久置会停在 idle 而非 waiting),
-# Stop 时清除。
+# ── Record state for `gtmux agents` (event-driven, BEFORE the focus check) ───
+# Status comes from the agent's OWN hook events, not from message wording:
+#   UserPromptSubmit → a turn started (mark "active"); you just answered → clear waiting
+#   Stop             → the turn ended → idle; clear active + waiting; set last-finished
+#   Notification     → if it arrives MID-TURN (active) it's a permission/approval
+#                      request → ⏸ waiting; if it arrives while idle it's just
+#                      Claude's idle nudge → ignore. (Timing, not keywords.)
+# 状态来自 agent 自己的 hook 事件,不看文案:UserPromptSubmit=一轮开始(active);
+# Stop=一轮结束(idle,清除);Notification 若在【一轮中】到达=权限请求→⏸ waiting,
+# 若在 idle 时到达=空闲提醒→忽略。靠时机区分,不靠关键词。
 EVENT="$(printf '%s' "$_stdin" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
-# The Notification message — permission requests mention "permission"/"approve";
-# the idle nudge ("Claude is waiting for your input") does not.
-NMSG="$(printf '%s' "$_stdin" | sed -n 's/.*"message"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 | tr 'A-Z' 'a-z')"
 GTDIR="$HOME/.local/share/gtmux"
-_target="${TMUX_PANE:-$SESSION}"
-if [ -n "$_target" ]; then
-  mkdir -p "$GTDIR/waiting" 2>/dev/null
-  printf '%s' "$_target" > "$GTDIR/last-finished" 2>/dev/null || true
-fi
-if [ -n "${TMUX_PANE:-}" ]; then
+P="${TMUX_PANE:-}"
+mkdir -p "$GTDIR/waiting" "$GTDIR/active" 2>/dev/null
+if [ -n "$P" ]; then
   case "$EVENT" in
+    UserPromptSubmit)
+      : > "$GTDIR/active/$P" 2>/dev/null || true   # turn started
+      rm -f "$GTDIR/waiting/$P" 2>/dev/null         # you answered → not waiting
+      ;;
+    Stop)
+      rm -f "$GTDIR/active/$P" "$GTDIR/waiting/$P" 2>/dev/null   # turn ended → idle
+      printf '%s' "$P" > "$GTDIR/last-finished" 2>/dev/null || true
+      ;;
     Notification)
-      case "$NMSG" in
-        *permission*|*approve*|*approval*|*"wants to"*)
-          : > "$GTDIR/waiting/$TMUX_PANE" 2>/dev/null || true;;
-      esac;;
-    Stop) rm -f "$GTDIR/waiting/$TMUX_PANE" 2>/dev/null || true;;
+      [ -f "$GTDIR/active/$P" ] && : > "$GTDIR/waiting/$P" 2>/dev/null  # mid-turn → permission
+      printf '%s' "$P" > "$GTDIR/last-finished" 2>/dev/null || true
+      ;;
   esac
 fi
-log_dbg "event=[$EVENT] msg=[$NMSG]"
+log_dbg "event=[$EVENT] active=$([ -n "$P" ] && [ -f "$GTDIR/active/$P" ] && echo 1 || echo 0)"
+
+# UserPromptSubmit is state bookkeeping only — no desktop notification for it.
+[ "$EVENT" = "UserPromptSubmit" ] && exit 0
 
 # ── Suppress when you're already watching this session's Ghostty tab ─────────
 # Inside tmux $TERM_PROGRAM is "tmux", so detect Ghostty via AppleScript, not env.
