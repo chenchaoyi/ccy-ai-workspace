@@ -126,130 +126,37 @@ tab 的原因 —— 写的一侧(`set-titles`)和读的一侧(`focus`)是同一
 
 ## `gtmux` 命令行 —— tmux 会话与 coding agent 的指挥台
 
-`gtmux` 是你 tmux 会话、以及里面跑着的 coding agent 的指挥台。一个命令,四个动词 ——
-**`overview`**(看会话)、**`agents`**(看谁在跑 / 空闲 / 等你)、**`restore`**(重建 tab)、
-**`focus`**(跳到 tab/pane)。它是个单文件 Go 二进制,现已拆成独立仓库 ——
-[github.com/chenchaoyi/gtmux](https://github.com/chenchaoyi/gtmux) —— 用它的 curl
-一行命令安装(预编译、经校验和验证的二进制;优先 GitHub,失败回退国内镜像,无需 Go 工具链):
+`gtmux` 是你 tmux 会话、以及里面跑着的 coding agent 的指挥台 —— **`agents`**(谁在跑 /
+空闲 / 等你)、**`overview`**(看会话)、**`restore`**(重建 tab)、**`focus`**(跳到
+tab/pane)。它不是 spawner:是覆盖你已经在 tmux 里跑的一切的"雷达 + 遥控器"。
+
+它维护在**独立仓库 —— [github.com/chenchaoyi/gtmux](https://github.com/chenchaoyi/gtmux)**,
+完整 CLI 文档都在那边。`install.sh`(第 3 步)用它的 curl 一行命令替你安装(预编译、经
+校验和验证的二进制;优先 GitHub,失败回退国内镜像,无需 Go 工具链):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/chenchaoyi/gtmux/main/install.sh | bash
 ```
 
-`install.sh`(第 3 步)会替你跑这条命令。它显式调用、不碰 bashrc/zshrc,换什么 shell
-都能用。不带参数直接敲 `gtmux` 显示帮助(`gtmux --version` 看版本);输出语言由
-`--lang=en|zh`(默认 `en`)或 `$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
+### 本工作环境怎么把它接进来
 
-**它和别的不一样**:claude-squad、uzi、dmux 这类是 agent **spawner**——替你在 git
-worktree 里生成、隔离 agent;**gtmux 不替你跑 agent**,它是**覆盖你已经在 tmux 里跑的
-一切的"雷达 + 遥控器"**:看清谁在跑 / 空闲 / 等你,并跳到确切 pane。非侵入、tmux 原生,
-连别的工具生成的 agent 也能照看到(它们也在 tmux 里)。
+gtmux 只是个 CLI;下面这些键绑定在本仓库的 `tmux/tmux.conf` 里(还有
+`set-titles-string '#S — #W'`,`focus` 靠它定位 tab):
 
-```
-gtmux agent — 6 agent · 1 运行中 · 5 空闲
+| 键 | 跑 | 作用 |
+| --- | --- | --- |
+| `前缀 + g` | `gtmux overview --popup` | session/window/pane 弹窗,悬浮在任何全屏程序之上 |
+| `前缀 + a` | `gtmux agents --watch --popup` | 实时 agent 面板(↑/↓ 选 · Enter 跳 · q 退;跳转后自动关) |
+| `前缀 + G` | 速查表 | tmux 命令速查表(`~/.tmux-cheatsheet.txt`) |
+| `前缀 + J` | `gtmux focus $(cat …/last-finished)` | 跳到最近完成的那个 agent 的 pane |
 
-⠿ 运行中  Claude Code  ccy-workspace:0.0     Auto-attach tmux sessions…   %11
-✳ 空闲    Claude Code  Pica:0.0              去除6月6日的爬取               %7
-✳ 空闲    Claude Code  Rodi:0.0              Rodi feature dev   %8  ✓ 最近完成
-✳ 空闲    Claude Code  Diting:0.0            —                  %1
+Ghostty 重启后,在任意 tab 里跑一次 **`gtmux restore`**,把每个 tmux session 接回到各自
+的 tab(电脑重启后它还会启动 tmux 并等 tmux-continuum —— 在 `tmux.conf` 里配置 —— 恢复
+最近一次存档)。`⏸ 等输入` / `✓ latest` 这些 agent 信号、以及点击直达的通知,都由本仓库的
+`claude-notify` 钩子产出(见下一节)。
 
-跳转: gtmux focus <pane>   (例如 gtmux focus %11)
-```
-
-**多 agent 指挥台** —— 一处看清谁在等你、谁在跑、谁空闲。每行:**状态**
-(`⏸ 等输入` / `⠿ 运行中` / `✳ 空闲`)、**agent 类型**(Claude Code、Codex、Gemini、
-aider…)、位置、任务、**pane id** —— 按紧急度排序(等输入 → 运行中 → 空闲),表头给状态分布。
-
-三种状态:**`⠿ 运行中`**(忙,别打扰)、**`⏸ 等输入`**(任务进行中**卡在等你批准/权限**
-—— 排在最顶,一眼看出哪个 agent 要你拍板)、**`✳ 空闲`**(完成了一轮,轮到你、不紧急)。
-`⏸ 等输入` 由 `claude-notify` 从 Claude Code 的**权限** `Notification` 记录、agent 下次
-响应时清除;Claude 的**空闲提醒不会**标成等输入,所以久置的 session 会停在 `✳ 空闲`。
-(需要 claude-notify;没有这个信号的 agent 永远不会显示 `⏸`。)
-
-跑 **`gtmux agents --watch`** 是一个可常驻的实时面板(也可用 **`前缀 + a`** 随手弹出,
-跳转后自动关闭):每 ~1.5 秒自刷新,**↑/↓** 选行、**Enter** 跳到那个 pane、**r** 刷新、
-**q** 退出。看着的时候有 agent 完成(运行中 → 空闲)会标 `✓ 完成`,完成动态实时可见。
-
-检测**不锁死 Claude**:
-- **状态**读自 agent 自己设的 pane 标题。标题以盲文 spinner(`⠋⠙⠹…`,多数 agent TUI
-  工作时都在转)开头 = **运行中**;Claude Code 的 `✳` = **空闲**。用 spinner 的 agent 通用。
-- **是哪个 agent** 按前台命令名(`claude`、`codex`、`gemini`、`aider`、`opencode`…)
-  或标题里的名字匹配。
-- 用 **`~/.config/gtmux/agents.json`** 扩展/覆盖 —— 一个 `{"name","commands","idleGlyph"}`
-  的 JSON 数组;你的条目优先于内置。
-- 最近一个完成的 pane(就是 `claude-notify` 弹的那条)标 `✓ 最近完成`。
-
-只有 agent **进程真的在跑**(前台命令是 agent,或标题在转 spinner)才会被列出。普通 shell
-上残留的 agent 标题 —— 比如 tmux-resurrect 恢复回来但没重启 agent 的 session —— **不会**算进去。
-
-> 精确的"运行中 vs 空闲"要靠 agent 自己发信号(spinner,或已知的空闲字形)。只靠命令名
-> 识别、又没有标题信号的 agent 显示 `● running`(进程在跑);在配置里给它加 `idleGlyph` 即可细化。
-
-### `gtmux restore` —— 把 session 接回成 tab
-
-quit Ghostty 后 tmux server 和所有 session 都还活着,消失的只是 Ghostty 的
-tab。重开 Ghostty 后,在任意 tab 里运行**一次**:
-
-```bash
-gtmux restore            # 每个 session 一个 tab,一次全部接回
-```
-
-它通过 Ghostty 1.3+ 的原生 AppleScript 能力,为每个 session 开一个 tab 并全部
-attach;你运行命令的那个 tab 复用给第一个 session;`window-save-state` 恢复
-出来的多余空白 tab 直接 Cmd+W 关掉即可。首次运行会弹出自动化授权("想要控制
-Ghostty"),点允许即可。tab 按 session 名字顺序创建 —— 原来"哪个 tab 对应
-哪个 session"没有任何地方记录,无法精确复原顺序。
-也可以在单个 tab 里逐个接:
-
-```bash
-gtmux restore --pick     # 列出所有 session(含 window 和连接状态),自己选:
-                         # 输编号("1 3" 或 "1,3"),回车=全部待接回,q=取消
-gtmux restore --one      # 当前 tab 接回下一个无人连接的 session
-gtmux restore <名字>      # 或按名字 attach 指定 session
-```
-
-**电脑意外重启后** tmux server 本身也没了,`gtmux restore` 依然适用:它会启动
-tmux 并等 tmux-continuum 恢复最近一次自动存档(每 5 分钟存一次)——
-session/window 结构、各 pane 的目录和屏幕文本都会回来。**正在运行的程序不会
-自动重启**,每个 pane 恢复成停在原目录的 shell(比如 Claude Code 用
-`claude --resume` 重新拉起)。
-
-### `gtmux overview` —— 看现在跑着什么(也是 `前缀+g`)
-
-在任何地方按 **`前缀 + g`** —— 包括 Claude Code、vim 等全屏程序正在运行时 ——
-一个按内容自适应大小的弹窗会悬浮在上方,完全不打断当前工作,按任意键关闭:
-
-```
-tmux overview — 2 sessions · 3 windows · 5 panes
-
-▶ ccy-ai-workspace     1 window · 1 pane
-    0: ccy-ai-workspace *  (1 pane)
-
-● tryout3              2 windows · 4 panes
-    0: wifiscope  (1 pane)
-    1: claude code *  (3 panes)
-
-▶ 当前  ● 已连接  ○ 待接回   * 活跃  Z 放大  • 新输出   (跳转: gtmux focus <名字>)
-```
-
-原理:前缀键由 tmux 拦截,轮不到 pane 里的前台程序,所以全屏 agent 跑着也能
-随时呼出。同样的汇总在任意 shell 里可用 CLI 查看:`gtmux overview`(或直接 `gtmux`)。
-命令速查表在隔壁:**`前缀 + G`**。
-
-### `gtmux focus <名字>` —— 跳到某个 session 的 tab
-
-```bash
-gtmux focus shop         # 把显示 session "shop" 的 Ghostty tab 拉到最前
-```
-
-这是 `set-titles` 的【读】侧:因为每个 tab 标题都是 "session — window",
-`focus` 找到标题匹配 `<名字>` 的那个 tab,调用 Ghostty 的 AppleScript
-`select tab` + `activate`。它本身就好用("跳到那个项目"),也是桌面通知
-点击后跳到正确 tab 的那个钩子 —— 后台 agent 干完活,一点通知就落到它的 tab 上。
-
-> 前提是 `set-titles` 独占 tab 标题。如果还有别的工具也在写 tab 标题
-> (比如 peon-ping 的 `terminal_tab_title`),把那个关掉,标题才会保持
-> `focus` 匹配所依赖的 "session — window" 格式。
+完整的逐命令文档(agent 检测与 `agents.json`、restore 各模式、`--json`、镜像选项等)见
+[gtmux 仓库 README](https://github.com/chenchaoyi/gtmux/blob/main/README.zh.md)。
 
 ## agent 完成通知,点击直达"确切 pane"(Claude Code)
 

@@ -135,152 +135,42 @@ write side (`set-titles`) and the read side (`focus`) are one feature.
 
 ## The `gtmux` CLI — command center for tmux sessions + coding agents
 
-`gtmux` is a command center for your tmux sessions and the coding agents running
-in them. One command, four verbs — **`overview`** (see sessions), **`agents`**
-(see who's working / idle / waiting on you), **`restore`** (rebuild your tabs),
-**`focus`** (jump to a tab/pane). It's a single Go binary, now maintained in its
-own repo — [github.com/chenchaoyi/gtmux](https://github.com/chenchaoyi/gtmux) —
-and installed via its curl one-liner (a prebuilt, checksum-verified binary;
-GitHub-first with a CN mirror fallback, no Go toolchain needed):
+`gtmux` is the command center for your tmux sessions and the coding agents
+running in them — **`agents`** (who's working / idle / waiting on you),
+**`overview`** (sessions), **`restore`** (rebuild your tabs), **`focus`** (jump
+to a tab/pane). It's a non-spawner: the radar + remote over whatever you already
+run in tmux.
+
+It's maintained in its **own repo — [github.com/chenchaoyi/gtmux](https://github.com/chenchaoyi/gtmux)** —
+where the full CLI reference lives. `install.sh` (step 3) installs it for you via
+its curl one-liner (a prebuilt, checksum-verified binary; GitHub-first with a CN
+mirror fallback, no Go toolchain needed):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/chenchaoyi/gtmux/main/install.sh | bash
 ```
 
-`install.sh` runs this for you (step 3). It's invoked explicitly — no
-bashrc/zshrc hooks, works with any shell. Bare `gtmux` prints help
-(`gtmux --version` for the version); output language follows `--lang=en|zh`
-(default `en`) or `$GTMUX_LANG`; `gtmux --help` shows full usage.
+### How this workspace wires it in
 
-**How it's different.** Unlike agent *spawners* (claude-squad, uzi, dmux, …)
-that create and sandbox agents in git worktrees, gtmux doesn't run your agents
-— it's the **radar + remote over whatever you already run in tmux**: see who's
-working / idle / waiting on you, and jump to the exact pane. Non-invasive and
-tmux-native; it even surfaces agents *other* tools spawned (they're in tmux too).
+gtmux is just a CLI; the bindings below live in this repo's `tmux/tmux.conf`
+(and `set-titles-string '#S — #W'`, which `focus` reads to locate tabs):
 
-### `gtmux agents` — see your coding agents at a glance
+| key | runs | what it does |
+| --- | --- | --- |
+| `prefix + g` | `gtmux overview --popup` | sessions/windows/panes popup, floats over any full-screen program |
+| `prefix + a` | `gtmux agents --watch --popup` | live agent dashboard (↑/↓ select · Enter jump · q quit; closes on jump) |
+| `prefix + G` | cheatsheet | the tmux key cheatsheet (`~/.tmux-cheatsheet.txt`) |
+| `prefix + J` | `gtmux focus $(cat …/last-finished)` | jump to the pane of the agent that most recently finished |
 
-```
-gtmux agents — 6 agents · 1 working · 5 idle
+After a Ghostty restart, run **`gtmux restore`** once in any tab to reattach
+every tmux session to its own tab (after a reboot it also boots tmux and waits
+for tmux-continuum — configured in `tmux.conf` — to restore the last autosave).
+The `⏸ waiting` / `✓ latest` agent signals and click-to-jump notifications are
+produced by this repo's `claude-notify` hook (see the next section).
 
-⠿ working  Claude Code  ccy-workspace:0.0     Auto-attach tmux sessions…   %11
-✳ idle     Claude Code  Pica:0.0              去除6月6日的爬取               %7
-✳ idle     Claude Code  Rodi:0.0              Rodi feature dev   %8  ✓ latest
-✳ idle     Claude Code  Diting:0.0            —                  %1
-
-jump: gtmux focus <pane>   (e.g. gtmux focus %11)
-```
-
-The multi-agent control panel — one place to see who's working, who's idle, and
-who just finished. Each row: **status** (`⏸ waiting` / `⠿ working` / `✳ idle`),
-the **agent** (Claude Code, Codex, Gemini, aider, …), location, the task, and the
-**pane id** — sorted by urgency (waiting → working → idle), with a status
-breakdown in the header.
-
-The three states: **`⠿ working`** (busy — don't bother it), **`⏸ waiting`**
-(blocked on **you** for a permission/approval, mid-task — these sort to the very
-top so you instantly see which agent needs a decision), and **`✳ idle`**
-(finished its turn, your move when you're ready — not urgent). `⏸ waiting` is
-recorded from Claude Code's *permission* `Notification` (via `claude-notify`) and
-cleared when the agent next responds; Claude's idle-timeout nudge does **not**
-mark waiting, so a long-idle session stays `idle`. (Needs claude-notify; other
-agents without that signal never show `⏸`.)
-
-Run **`gtmux agents --watch`** for a live, auto-refreshing dashboard you can keep
-open in a pane — or pop it open anytime with **`prefix + a`** (which closes once
-you jump): it polls every ~1.5s, **↑/↓** select a row, **Enter** jumps to that
-pane, **r** refreshes, **q** quits. Agents that finish while you watch (working →
-idle) get flagged `✓ done` so you notice completions in real time.
-
-Detection is **not Claude-only**:
-- **Status** comes from the pane title the agent sets itself. A leading braille
-  spinner (`⠋⠙⠹…`, what most agent TUIs animate) means **working**; Claude Code's
-  `✳` means **idle**. This generalizes across agents that use a spinner.
-- **Which agent** is matched by foreground command (`claude`, `codex`, `gemini`,
-  `aider`, `opencode`, …) or by a name in the title.
-- Extend or override the set via **`~/.config/gtmux/agents.json`** — a JSON array
-  of `{"name","commands","idleGlyph"}`; your entries win over the built-ins.
-- The pane that most recently finished (the one `claude-notify` pinged about) is
-  flagged `✓ latest`.
-
-A pane is listed only if the agent **process is actually running** (foreground
-command is the agent, or the title is animating a spinner). A leftover agent
-title over a plain shell — e.g. a session restored by tmux-resurrect where the
-agent was never relaunched — is **not** counted.
-
-> Precise *working vs idle* needs the agent to signal it (a spinner, or a known
-> idle glyph). Agents detected only by command name but with no title signal
-> show `● running` (process up); add an `idleGlyph` in the config to refine them.
-
-### `gtmux restore` — reattach sessions to tabs
-
-Quitting Ghostty leaves the tmux server and all sessions alive — only the
-Ghostty tabs are gone. After reopening Ghostty, run **once** in any tab:
-
-```bash
-gtmux restore            # one Ghostty tab per tmux session, all attached
-```
-
-It opens one tab per session (via Ghostty 1.3+'s native AppleScript support)
-and attaches them all; the tab you ran it in takes the first session. Leftover
-blank tabs restored by `window-save-state` can just be closed (Cmd+W). The
-first run pops an Automation permission dialog ("wants to control Ghostty") —
-click Allow. Tabs are created in session-name order; the original tab↔session
-arrangement isn't recorded anywhere, so it can't be reproduced exactly. Per-tab
-fallback:
-
-```bash
-gtmux restore --pick     # list all sessions (with windows & status), then
-                         # choose which: numbers ("1 3" or "1,3"),
-                         # Enter = all detached, q = cancel
-gtmux restore --one      # attach the next unattached session here
-gtmux restore <name>     # or attach a specific session by name
-```
-
-**After a machine reboot** the tmux server itself is gone. `gtmux restore`
-still works: it starts tmux and waits for tmux-continuum to restore the last
-autosave (every 5 min) — sessions, windows, per-pane directories and on-screen
-text. **Running programs are not restarted**; each pane comes back as a shell
-in its old directory (e.g. restart Claude Code with `claude --resume`).
-
-### `gtmux overview` — see what's running (also `prefix+g`)
-
-Press **`prefix + g`** anywhere — even while a full-screen program (Claude
-Code, vim, …) is running — and a size-fitted popup floats over it without
-interrupting anything; any key closes it:
-
-```
-tmux overview — 2 sessions · 3 windows · 5 panes
-
-▶ ccy-ai-workspace     1 window · 1 pane
-    0: ccy-ai-workspace *  (1 pane)
-
-● tryout3              2 windows · 4 panes
-    0: wifiscope  (1 pane)
-    1: claude code *  (3 panes)
-
-▶ current  ● attached  ○ detached   * active  Z zoomed  • new output   (jump: gtmux focus <name>)
-```
-
-This works because tmux intercepts the prefix before the foreground program
-sees it. The same summary is available from any shell: `gtmux overview` (or
-just `gtmux`). The key cheatsheet lives next door on **`prefix + G`**.
-
-### `gtmux focus <name>` — jump to a session's tab
-
-```bash
-gtmux focus shop         # bring the Ghostty tab showing session "shop" to front
-```
-
-This is the read side of `set-titles`: because each tab title is
-"session — window", `focus` finds the tab whose title matches `<name>` and
-runs Ghostty's AppleScript `select tab` + `activate`. Handy on its own ("jump
-to that project"), and it's the hook a desktop-notification click can call to
-land you on the right tab when a background agent finishes.
-
-> Needs `set-titles` to stay authoritative over tab titles. If another tool
-> writes the tab title too (e.g. peon-ping's `terminal_tab_title`), turn that
-> off so titles stay in the "session — window" format `focus` matches on.
+See the [gtmux repo README](https://github.com/chenchaoyi/gtmux#readme) for the
+full per-command docs (agent detection & `agents.json`, restore modes, `--json`,
+mirror options, etc.).
 
 ## Agent-done notifications that click through to the exact pane (Claude Code)
 
