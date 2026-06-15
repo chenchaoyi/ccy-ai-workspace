@@ -60,6 +60,30 @@ fi
 TITLE="${SESSION:-Claude Code}"
 log_dbg "session=[$SESSION] TMUX=[${TMUX:-}] PANE=[${TMUX_PANE:-}] TERM_PROGRAM=[${TERM_PROGRAM:-}]"
 
+# ── Record state for `gtmux agents` (BEFORE the focus check, so it's correct
+# even when the notification itself is suppressed) ──────────────────────────
+# Parse the hook event: Stop = the agent finished a turn; Notification = it wants
+# your input/permission. $TMUX_PANE is this agent's own pane (the hook runs in it).
+#  - last-finished: the pane that most recently pinged → jump target (prefix+J, click)
+#  - waiting/<pane>: this pane is blocked on YOU (Notification); cleared on Stop.
+#    `gtmux agents` shows these as "⏸ waiting".
+# 在【聚焦判断之前】记录状态,这样即使通知被静默,gtmux agents 也准。Stop=完成一轮;
+# Notification=要你输入/授权。waiting/<pane> 标记"在等你",Stop 时清除 → agents 显示 ⏸。
+EVENT="$(printf '%s' "$_stdin" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+GTDIR="$HOME/.local/share/gtmux"
+_target="${TMUX_PANE:-$SESSION}"
+if [ -n "$_target" ]; then
+  mkdir -p "$GTDIR/waiting" 2>/dev/null
+  printf '%s' "$_target" > "$GTDIR/last-finished" 2>/dev/null || true
+fi
+if [ -n "${TMUX_PANE:-}" ]; then
+  case "$EVENT" in
+    Notification) : > "$GTDIR/waiting/$TMUX_PANE" 2>/dev/null || true;;
+    Stop)         rm -f "$GTDIR/waiting/$TMUX_PANE" 2>/dev/null || true;;
+  esac
+fi
+log_dbg "event=[$EVENT]"
+
 # ── Suppress when you're already watching this session's Ghostty tab ─────────
 # Inside tmux $TERM_PROGRAM is "tmux", so detect Ghostty via AppleScript, not env.
 # tmux 内 $TERM_PROGRAM 是 "tmux",所以用 AppleScript 判断 Ghostty,而非环境变量。
@@ -95,19 +119,6 @@ log_dbg "decision=NOTIFY (front_sel_match=$front_sel_match)"
 # stderr 写进日志(而非 /dev/null),便于看报错。
 NERR=/dev/null
 [ -f "$HOME/.claude/.claude-notify-debug" ] && NERR="$HOME/.claude/claude-notify.log"
-# Record the EXACT pane the agent ran in (this hook runs inside it, so $TMUX_PANE
-# is that pane's global id). The helper app and prefix+J pass it to `gtmux focus`,
-# which selects that window+pane in tmux and brings the Ghostty tab forward — so
-# the jump lands on the precise pane, not just the session. Falls back to the
-# session name if somehow not in tmux.
-# 记下 agent 所在的【确切 pane】(本钩子就跑在它里面,$TMUX_PANE 即该 pane 的全局 id)。
-# 中转 app 和 prefix+J 把它交给 `gtmux focus`:它在 tmux 里选中那个 window+pane 再把
-# Ghostty tab 切前台 —— 一跳落到确切 pane,而非只到 session。不在 tmux 时回退到 session 名。
-_target="${TMUX_PANE:-$SESSION}"
-if [ -n "$_target" ]; then
-  mkdir -p "$HOME/.local/share/gtmux" 2>/dev/null
-  printf '%s' "$_target" > "$HOME/.local/share/gtmux/last-finished" 2>/dev/null || true
-fi
 
 if command -v terminal-notifier >/dev/null 2>&1; then
   # Native + clickable → jumps to the exact tab. Trick: on modern macOS (26.x)

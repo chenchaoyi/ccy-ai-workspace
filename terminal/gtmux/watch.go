@@ -23,16 +23,16 @@ var (
 )
 
 type watchModel struct {
-	panes    []agentPane
-	nWorking int
-	sel      int
-	prev     map[string]string // paneID → last status (for transition detection)
-	finished map[string]bool   // panes that went working→idle during this session
+	panes      []agentPane
+	sel        int
+	prev       map[string]string // paneID → last status (for transition detection)
+	finished   map[string]bool   // panes that went working→idle during this session
+	quitOnJump bool              // close the TUI after a jump (popup mode)
 }
 
-func runWatch() int {
-	p, w := gatherAgents()
-	m := watchModel{panes: p, nWorking: w, prev: statusMap(p), finished: map[string]bool{}}
+func runWatch(quitOnJump bool) int {
+	p := gatherAgents()
+	m := watchModel{panes: p, prev: statusMap(p), finished: map[string]bool{}, quitOnJump: quitOnJump}
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		sae("watch failed: "+err.Error(), "watch 失败: "+err.Error())
 		return 1
@@ -74,7 +74,11 @@ func (m watchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.sel >= 0 && m.sel < len(m.panes) {
 				id := m.panes[m.sel].paneID
 				delete(m.finished, id) // acknowledged
-				return m, func() tea.Msg { jumpPane(id); return nil }
+				jumpCmd := func() tea.Msg { jumpPane(id); return nil }
+				if m.quitOnJump {
+					return m, tea.Sequence(jumpCmd, tea.Quit)
+				}
+				return m, jumpCmd
 			}
 		}
 	case tickMsg:
@@ -85,18 +89,19 @@ func (m watchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *watchModel) refresh() {
-	p, w := gatherAgents()
+	p := gatherAgents()
 	for _, a := range p {
-		if m.prev[a.paneID] == "working" && a.status != "working" {
-			m.finished[a.paneID] = true // just finished — flag until acknowledged/changed
+		// Flag a row that just finished (working → idle). "waiting" has its own
+		// prominent status, so don't double-flag it as "done".
+		if m.prev[a.paneID] == "working" && a.status == "idle" {
+			m.finished[a.paneID] = true
 		}
-		if a.status == "working" {
+		if a.status == "working" || a.status == "waiting" {
 			delete(m.finished, a.paneID)
 		}
 	}
 	m.prev = statusMap(p)
 	m.panes = p
-	m.nWorking = w
 	if m.sel >= len(p) {
 		m.sel = len(p) - 1
 	}
@@ -108,7 +113,7 @@ func (m *watchModel) refresh() {
 func (m watchModel) View() string {
 	var b strings.Builder
 	b.WriteString(stBoldW.Render("gtmux "+tr("agents (live)", "agent(实时)")) +
-		" — " + agentsSummary(m.panes, m.nWorking) + "\n\n")
+		" — " + agentsSummary(m.panes) + "\n\n")
 
 	if len(m.panes) == 0 {
 		b.WriteString(stDimW.Render(tr("No coding-agent panes found.", "没有发现 coding-agent 的 pane。")) + "\n")
@@ -119,6 +124,8 @@ func (m watchModel) View() string {
 		switch p.status {
 		case "working":
 			st, glyph, label = stWorking, "⠿", tr("working", "运行中")
+		case "waiting":
+			st, glyph, label = stRun, "⏸", tr("waiting", "等输入")
 		case "idle":
 			st, glyph, label = stIdle, "✳", tr("idle", "空闲")
 		default:

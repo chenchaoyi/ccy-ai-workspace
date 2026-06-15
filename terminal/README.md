@@ -158,15 +158,22 @@ jump: gtmux focus <pane>   (e.g. gtmux focus %11)
 ```
 
 The multi-agent control panel — one place to see who's working, who's idle, and
-who just finished. Each row: **status** (`⠿ working` / `✳ idle` / `● running`),
+who just finished. Each row: **status** (`⏸ waiting` / `⠿ working` / `✳ idle`),
 the **agent** (Claude Code, Codex, Gemini, aider, …), location, the task, and the
-**pane id** — working agents sorted first, with a status breakdown in the header.
+**pane id** — sorted by urgency (waiting → working → idle), with a status
+breakdown in the header.
+
+**`⏸ waiting`** means the agent is blocked on **your** input (a permission prompt
+or "your turn") — these sort to the very top so you can see at a glance which
+agent needs you. It's recorded from Claude Code's `Notification` hook by
+`claude-notify`, and cleared when the agent next responds (so it needs the
+notification setup; other agents without that signal won't show `⏸`).
 
 Run **`gtmux agents --watch`** for a live, auto-refreshing dashboard you can keep
-open in a pane — or pop it open anytime with **`prefix + a`**: it polls every
-~1.5s, **↑/↓** select a row, **Enter** jumps to that pane, **r** refreshes, **q**
-quits. Agents that finish while you watch (working → idle) get flagged `✓ done`
-so you notice completions in real time.
+open in a pane — or pop it open anytime with **`prefix + a`** (which closes once
+you jump): it polls every ~1.5s, **↑/↓** select a row, **Enter** jumps to that
+pane, **r** refreshes, **q** quits. Agents that finish while you watch (working →
+idle) get flagged `✓ done` so you notice completions in real time.
 
 Detection is **not Claude-only**:
 - **Status** comes from the pane title the agent sets itself. A leading braille

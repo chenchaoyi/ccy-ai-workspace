@@ -147,17 +147,19 @@ func classifyAgent(title, cmd string, profiles []agentProfile) (isAgent bool, ag
 	return true, agent, status, task
 }
 
-// gatherAgents polls every pane and returns the LIVE coding agents (working
-// first, then by location) and how many are working. Shared by the static
-// `gtmux agents` and the `--watch` TUI.
-func gatherAgents() (panes []agentPane, nWorking int) {
+// gatherAgents polls every pane and returns the LIVE coding agents, sorted
+// waiting → working → idle, then by location. Shared by static + watch.
+// A pane is "waiting" (blocked on your input) when claude-notify recorded a
+// Notification for it (~/.local/share/gtmux/waiting/<pane>) and it isn't working.
+func gatherAgents() []agentPane {
 	profiles := loadProfiles()
-	lastFinished := ""
-	if b, err := os.ReadFile(os.Getenv("HOME") + "/.local/share/gtmux/last-finished"); err == nil {
-		lastFinished = strings.TrimSpace(string(b))
-	}
+	dir := os.Getenv("HOME") + "/.local/share/gtmux"
+	lastFinished := readTrim(dir + "/last-finished")
+	waiting := waitingSet(dir + "/waiting")
+
 	fields := "#{pane_id}\t#{session_name}\t#{window_index}\t#{pane_index}\t" +
 		"#{pane_title}\t#{pane_current_command}\t#{window_activity_flag}"
+	var panes []agentPane
 	for _, line := range tmuxLines("list-panes", "-a", "-F", fields) {
 		f := strings.SplitN(line, "\t", 7)
 		if len(f) < 7 {
@@ -167,42 +169,92 @@ func gatherAgents() (panes []agentPane, nWorking int) {
 		if !isAgent {
 			continue
 		}
-		if status == "working" {
-			nWorking++
+		id := f[0]
+		switch {
+		case status == "working":
+			if waiting[id] { // resumed working → clear the stale waiting mark
+				os.Remove(dir + "/waiting/" + id)
+				delete(waiting, id)
+			}
+		case waiting[id]:
+			status = "waiting" // blocked on the user
 		}
 		panes = append(panes, agentPane{
-			paneID:   f[0],
+			paneID:   id,
 			loc:      fmt.Sprintf("%s:%s.%s", f[1], f[2], f[3]),
 			agent:    agent,
 			task:     task,
 			status:   status,
 			activity: f[6] == "1",
-			latest:   f[0] == lastFinished && status != "working",
+			latest:   id == lastFinished && status != "working" && status != "waiting",
 		})
 	}
 	sort.SliceStable(panes, func(i, j int) bool {
-		wi, wj := panes[i].status == "working", panes[j].status == "working"
-		if wi != wj {
-			return wi
+		if ri, rj := statusRank(panes[i].status), statusRank(panes[j].status); ri != rj {
+			return ri < rj
 		}
 		return panes[i].loc < panes[j].loc
 	})
-	return
+	return panes
 }
 
-// agentsSummary renders the header line's "N agents · X working · Y idle".
-func agentsSummary(panes []agentPane, nWorking int) string {
-	s := pl(len(panes), "agent")
-	if len(panes) > 0 {
-		s += tr(fmt.Sprintf(" · %d working · %d idle", nWorking, len(panes)-nWorking),
-			fmt.Sprintf(" · %d 运行中 · %d 空闲", nWorking, len(panes)-nWorking))
+func statusRank(s string) int {
+	switch s {
+	case "waiting":
+		return 0 // needs you now — most urgent
+	case "working":
+		return 1
+	default:
+		return 2
 	}
-	return s
 }
 
-// cmdAgents implements `gtmux agents [--watch]`.
+func readTrim(path string) string {
+	if b, err := os.ReadFile(path); err == nil {
+		return strings.TrimSpace(string(b))
+	}
+	return ""
+}
+
+// waitingSet reads the per-pane "waiting" marker files into a set of pane ids.
+func waitingSet(dir string) map[string]bool {
+	m := map[string]bool{}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if !e.IsDir() {
+			m[e.Name()] = true
+		}
+	}
+	return m
+}
+
+// agentsSummary renders "N agents · [X waiting ·] Y working · Z idle".
+func agentsSummary(panes []agentPane) string {
+	s := pl(len(panes), "agent")
+	if len(panes) == 0 {
+		return s
+	}
+	var nWork, nWait int
+	for _, p := range panes {
+		switch p.status {
+		case "working":
+			nWork++
+		case "waiting":
+			nWait++
+		}
+	}
+	parts := []string{}
+	if nWait > 0 {
+		parts = append(parts, fmt.Sprintf(tr("%d waiting", "%d 等输入"), nWait))
+	}
+	parts = append(parts, fmt.Sprintf(tr("%d working", "%d 运行中"), nWork))
+	parts = append(parts, fmt.Sprintf(tr("%d idle", "%d 空闲"), len(panes)-nWork-nWait))
+	return s + " · " + strings.Join(parts, " · ")
+}
+
+// cmdAgents implements `gtmux agents [--watch] [--popup]`.
 func cmdAgents(args []string) int {
-	watch := false
+	watch, popup := false, false
 	for _, a := range args {
 		switch a {
 		case "-h", "--help":
@@ -210,6 +262,8 @@ func cmdAgents(args []string) int {
 			return 0
 		case "--watch", "-w":
 			watch = true
+		case "--popup":
+			popup = true // close the TUI after a jump (used by the prefix+a popup)
 		}
 	}
 	if !tmuxServerUp() {
@@ -217,11 +271,11 @@ func cmdAgents(args []string) int {
 		return 1
 	}
 	if watch {
-		return runWatch()
+		return runWatch(popup)
 	}
 
-	panes, nWorking := gatherAgents()
-	fmt.Printf("%sgtmux %s%s — %s\n\n", cBold, tr("agents", "agent"), cReset, agentsSummary(panes, nWorking))
+	panes := gatherAgents()
+	fmt.Printf("%sgtmux %s%s — %s\n\n", cBold, tr("agents", "agent"), cReset, agentsSummary(panes))
 	if len(panes) == 0 {
 		say("No coding-agent panes found.", "没有发现 coding-agent 的 pane。")
 		return 0
@@ -257,6 +311,8 @@ func statusStyle(status string) (glyph, color, label string) {
 	switch status {
 	case "working":
 		return "⠿", cCyan, tr("working", "运行中")
+	case "waiting":
+		return "⏸", cYellow, tr("waiting", "等输入")
 	case "idle":
 		return "✳", cGreen, tr("idle", "空闲")
 	default:

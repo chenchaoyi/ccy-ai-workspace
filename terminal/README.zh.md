@@ -146,13 +146,17 @@ gtmux agent — 6 agent · 1 运行中 · 5 空闲
 跳转: gtmux focus <pane>   (例如 gtmux focus %11)
 ```
 
-**多 agent 指挥台** —— 一处看清谁在跑、谁空闲、谁刚完成。每行:**状态**
-(`⠿ 运行中` / `✳ 空闲` / `● running`)、**agent 类型**(Claude Code、Codex、Gemini、
-aider…)、位置、任务、**pane id** —— 运行中的排在最前,表头给状态分布。
+**多 agent 指挥台** —— 一处看清谁在等你、谁在跑、谁空闲。每行:**状态**
+(`⏸ 等输入` / `⠿ 运行中` / `✳ 空闲`)、**agent 类型**(Claude Code、Codex、Gemini、
+aider…)、位置、任务、**pane id** —— 按紧急度排序(等输入 → 运行中 → 空闲),表头给状态分布。
 
-跑 **`gtmux agents --watch`** 是一个可常驻的实时面板(也可用 **`前缀 + a`** 随手弹出):
-每 ~1.5 秒自刷新,**↑/↓** 选行、**Enter** 跳到那个 pane、**r** 刷新、**q** 退出。看着的
-时候有 agent 完成(运行中 → 空闲)会标 `✓ 完成`,完成动态实时可见。
+**`⏸ 等输入`** 表示这个 agent **卡在等你**(权限确认 / 轮到你了)—— 它们排在最顶,
+一眼就看出哪个 agent 需要你。这个状态由 `claude-notify` 从 Claude Code 的 `Notification`
+钩子记录,agent 下次响应时自动清除(所以需要启用了通知;没有这个信号的 agent 不会显示 `⏸`)。
+
+跑 **`gtmux agents --watch`** 是一个可常驻的实时面板(也可用 **`前缀 + a`** 随手弹出,
+跳转后自动关闭):每 ~1.5 秒自刷新,**↑/↓** 选行、**Enter** 跳到那个 pane、**r** 刷新、
+**q** 退出。看着的时候有 agent 完成(运行中 → 空闲)会标 `✓ 完成`,完成动态实时可见。
 
 检测**不锁死 Claude**:
 - **状态**读自 agent 自己设的 pane 标题。标题以盲文 spinner(`⠋⠙⠹…`,多数 agent TUI
