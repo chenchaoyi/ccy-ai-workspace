@@ -65,6 +65,15 @@ session: saas
 - Page `Ctrl-u`/`Ctrl-d`, line `j`/`k`, search `/`, select `v`, copy `y`, quit `q`
 - Mouse works too: wheel to scroll, drag to select
 
+### Opening URLs (Ghostty + tmux)
+- **`Cmd + Shift + click`** a link to open it in your browser.
+- Why the `Shift`: with `mouse on`, tmux captures clicks. Holding `Shift`
+  bypasses tmux's mouse grab (Ghostty's `mouse-shift-capture` default) so Ghostty
+  handles the click; `Cmd` is Ghostty's open-link modifier on macOS. Hold `Cmd`
+  while hovering to see the link underline first.
+- Outside tmux (plain Ghostty), `Cmd + click` alone works — the extra `Shift` is
+  only needed because tmux is grabbing the mouse.
+
 ### Misc
 - Reload config: `prefix + r` (custom in this config)
 - Manual save: `prefix + Ctrl-s`; restore: `prefix + Ctrl-r`

@@ -62,6 +62,13 @@ session: saas
 - 翻页 `Ctrl-u`/`Ctrl-d`,逐行 `j`/`k`,搜索 `/`,选区 `v`,复制 `y`,退出 `q`
 - 鼠标也可直接滚轮翻、拖拽选
 
+### 打开 URL 链接(Ghostty + tmux)
+- **`Cmd + Shift + 点击`** 链接即可在浏览器打开。
+- 为什么要加 `Shift`:开了 `mouse on` 后,tmux 会抢走鼠标点击。按住 `Shift` 可绕过
+  tmux 的鼠标捕获(Ghostty 的 `mouse-shift-capture` 默认行为),把点击交还给 Ghostty;
+  `Cmd` 是 Ghostty 在 macOS 上「打开链接」的修饰键。先按住 `Cmd` 悬停可看到链接下划线高亮。
+- 不在 tmux 里时(纯 Ghostty),单按 `Cmd + 点击` 即可——多按 `Shift` 只是因为 tmux 抢了鼠标。
+
 ### 其它
 - 重载配置:`前缀 + r`(本配置自定义)
 - 手动存档:`前缀 + Ctrl-s`;恢复:`前缀 + Ctrl-r`
