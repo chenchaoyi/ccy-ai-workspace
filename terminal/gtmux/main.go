@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 )
@@ -33,7 +34,8 @@ func main() {
 		}
 	}
 
-	sub := "overview"
+	// Bare `gtmux` (no command) prints usage. Run `gtmux overview` for the summary.
+	sub := ""
 	if len(args) > 0 {
 		sub = args[0]
 		args = args[1:]
@@ -41,6 +43,10 @@ func main() {
 
 	code := 0
 	switch sub {
+	case "", "-h", "--help", "help":
+		usage()
+	case "-v", "--version", "version":
+		fmt.Println("gtmux " + version)
 	case "overview", "ov":
 		code = cmdOverview(args)
 	case "restore", "re":
@@ -49,11 +55,9 @@ func main() {
 		code = cmdFocus(args)
 	case "agents", "ag":
 		code = cmdAgents(args)
-	case "-h", "--help", "help":
-		usage()
 	default:
-		sae("gtmux: unknown command '"+sub+"' (try: overview | restore | focus | agents | --help)",
-			"gtmux: 未知命令 '"+sub+"'(可用:overview | restore | focus | agents | --help)")
+		sae("gtmux: unknown command '"+sub+"' (try: overview | agents | restore | focus | --help)",
+			"gtmux: 未知命令 '"+sub+"'(可用:overview | agents | restore | focus | --help)")
 		code = 2
 	}
 	os.Exit(code)

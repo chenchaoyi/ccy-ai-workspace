@@ -133,15 +133,16 @@ so they come back correct after a reattach; don't rename Ghostty tabs by hand
 binding is also what lets `gtmux focus <session>` jump straight to a tab — the
 write side (`set-titles`) and the read side (`focus`) are one feature.
 
-## The `gtmux` CLI — one command for the Ghostty↔tmux workspace
+## The `gtmux` CLI — command center for tmux sessions + coding agents
 
-`gtmux` drives Ghostty from the tmux state layer. One command, four verbs —
-**`overview`** (see state), **`agents`** (see your coding agents), **`restore`**
-(build tabs), **`focus`** (jump to a tab/pane) — covering a tab's whole life.
-It's a single Go binary (built by `install.sh`; needs the Go toolchain for now,
-prebuilt binaries once it's a standalone repo) invoked explicitly — no
-bashrc/zshrc hooks, works with any shell. Run bare `gtmux` for the overview.
-Output language follows `--lang=en|zh` (default `en`) or `$GTMUX_LANG`;
+`gtmux` is a command center for your tmux sessions and the coding agents running
+in them. One command, four verbs — **`overview`** (see sessions), **`agents`**
+(see who's working / idle / waiting on you), **`restore`** (rebuild your tabs),
+**`focus`** (jump to a tab/pane). It's a single Go binary (built by `install.sh`;
+needs the Go toolchain for now, prebuilt binaries once it's a standalone repo)
+invoked explicitly — no bashrc/zshrc hooks, works with any shell. Bare `gtmux`
+prints help (`gtmux --version` for the version);
+output language follows `--lang=en|zh` (default `en`) or `$GTMUX_LANG`;
 `gtmux --help` shows full usage.
 
 ### `gtmux agents` — see your coding agents at a glance

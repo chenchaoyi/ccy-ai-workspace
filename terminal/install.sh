@@ -666,7 +666,8 @@ if [ "$UI_LANG" = zh ]; then
   3) 验证持久化:前缀 + Ctrl-s 手动存一次
   注意:在 repo 里改了配置后,需重跑本脚本才生效。
 
-gtmux —— 一个命令管 Ghostty↔tmux 工作区(三个动词):
+gtmux —— tmux 会话与 coding agent 的指挥台(四个动词;裸 gtmux 看帮助):
+  gtmux agents [--watch]   看 agent:谁在跑/空闲/等你(--watch 实时面板;也可 前缀+a)
   gtmux overview          看现状:session/window/pane 汇总(等同前缀+g 弹窗)
   gtmux focus <名字>       跳转:把显示该 session 的 Ghostty tab 拉到最前
   gtmux restore           接回:重开 Ghostty 后,在任意 tab、任意目录运行【一次】,
@@ -698,7 +699,8 @@ Next steps:
   3) Verify persistence: prefix + Ctrl-s to save once
   Note: repo edits are NOT live until you re-run this script.
 
-gtmux — one command for the Ghostty↔tmux workspace (three verbs):
+gtmux — command center for tmux sessions + coding agents (four verbs; bare gtmux = help):
+  gtmux agents [--watch]  AGENTS: who's working / idle / waiting on you (--watch live; or prefix+a)
   gtmux overview          SEE: sessions/windows/panes summary (= the prefix+g popup)
   gtmux focus <name>      JUMP: bring the Ghostty tab showing that session to front
   gtmux restore           BUILD: after reopening Ghostty, run ONCE in any tab, from

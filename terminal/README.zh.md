@@ -124,14 +124,14 @@ tmux server(整台机器只有一个,装着所有状态)
 这个"名字写在 tab 上"的绑定,也正是 `gtmux focus <session>` 能直接跳到对应
 tab 的原因 —— 写的一侧(`set-titles`)和读的一侧(`focus`)是同一套能力。
 
-## `gtmux` 命令行 —— 一个命令管 Ghostty↔tmux 工作区
+## `gtmux` 命令行 —— tmux 会话与 coding agent 的指挥台
 
-`gtmux` 用 tmux 状态层驱动 Ghostty。一个命令,四个动词 —— **`overview`**(看现状)、
-**`agents`**(看你的 coding agent)、**`restore`**(建 tab)、**`focus`**(跳到 tab/pane)
-—— 覆盖一个 tab 的完整生命周期。它是个单文件 Go 二进制(由 `install.sh` 编译,目前
-需要 Go 工具链;抽成独立仓库后会有预编译二进制),显式调用、不碰 bashrc/zshrc,换什么
-shell 都能用。不带参数直接敲 `gtmux` 就是看概览。输出语言由 `--lang=en|zh`(默认 `en`)
-或 `$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
+`gtmux` 是你 tmux 会话、以及里面跑着的 coding agent 的指挥台。一个命令,四个动词 ——
+**`overview`**(看会话)、**`agents`**(看谁在跑 / 空闲 / 等你)、**`restore`**(重建 tab)、
+**`focus`**(跳到 tab/pane)。它是个单文件 Go 二进制(由 `install.sh` 编译,目前需要 Go
+工具链;抽成独立仓库后会有预编译二进制),显式调用、不碰 bashrc/zshrc,换什么 shell 都能用。
+不带参数直接敲 `gtmux` 显示帮助(`gtmux --version` 看版本);输出语言由 `--lang=en|zh`
+(默认 `en`)或 `$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
 
 ### `gtmux agents` —— 一眼看清你的 coding agent
 
