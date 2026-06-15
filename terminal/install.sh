@@ -9,7 +9,8 @@
 # What it does / 做什么:
 #   - Ghostty config      -> ~/.config/ghostty/config
 #   - tmux config         -> ~/.tmux.conf
-#   - gtmux CLI (Go)      -> ~/.local/bin/gtmux (overview / agents / restore / focus)
+#   - gtmux CLI           -> ~/.local/bin/gtmux (overview / agents / restore / focus)
+#                            installed via github.com/chenchaoyi/gtmux curl one-liner
 #   - cwd reporter        -> ~/.ghostty-cwd.bash (for macOS bash 3.2)
 #   - tpm + tmux plugins (headless, no prefix+I needed)
 #
@@ -347,25 +348,51 @@ install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
 # 安装到 PATH(~/.local/bin)的独立命令行,与 shell 配置无关。一个命令三个动词:
 # `gtmux restore`(一键接回全部 session)、`gtmux overview`(前缀+g 弹窗,也可直接跑)、
 # `gtmux focus <名字>`(跳到对应 tab)。
-say "== 3/7 CLI tool (gtmux, Go) ==" "== 3/7 命令行工具(gtmux,Go)=="
-# gtmux is a Go program (terminal/gtmux). Build it with the local Go toolchain
-# and install the binary. (Standalone repo will ship prebuilt binaries later.)
-# gtmux 是 Go 程序(terminal/gtmux):用本机 Go 工具链编译后安装二进制。
-# (将来独立仓库会提供预编译二进制。)
-if command -v go >/dev/null 2>&1; then
-  _gobin="$(mktemp -d)/gtmux"
-  if ( cd "$DIR/gtmux" && go build -trimpath -o "$_gobin" . ); then
-    install_file "$_gobin" "$HOME/.local/bin/gtmux"
-    chmod +x "$HOME/.local/bin/gtmux"
-  else
-    say_err "✗ gtmux build failed (go build) — skipping; fix Go and re-run" \
-            "✗ gtmux 编译失败(go build)—— 跳过;修好 Go 后重跑"
+say "== 3/7 CLI tool (gtmux) ==" "== 3/7 命令行工具(gtmux)=="
+# gtmux now lives in its own repo (github.com/chenchaoyi/gtmux) and is installed
+# via its curl one-liner, which fetches a prebuilt, checksum-verified binary
+# (GitHub-first, with a CN mirror-chain fallback). No local Go toolchain needed.
+# We bootstrap the installer SCRIPT itself with the same direct→mirror fallback
+# (raw.githubusercontent.com is also often blocked on CN networks), then fall
+# back to `go install` if the script can't be fetched at all.
+# gtmux 已拆成独立仓库(github.com/chenchaoyi/gtmux),用它的 curl 一行命令安装:
+# 拉取预编译、经校验和验证的二进制(优先 GitHub,失败回退国内镜像链),无需本机 Go。
+# 安装器脚本本身也用「直连→镜像」回退获取(raw.githubusercontent.com 在国内也常被墙),
+# 都拿不到时再退回 `go install`。
+_gtmux_raw="https://raw.githubusercontent.com/chenchaoyi/gtmux/main/install.sh"
+_gtmux_script="$(mktemp)"
+_gtmux_got=""
+for _pre in "" "https://ghfast.top/" "https://gh-proxy.com/"; do
+  if curl -fsSL --max-time 20 "${_pre}${_gtmux_raw}" -o "$_gtmux_script" 2>/dev/null \
+     && head -1 "$_gtmux_script" | grep -q '^#!.*bash'; then
+    _gtmux_got=1; break
   fi
-  rm -rf "$(dirname "$_gobin")" 2>/dev/null
+done
+if [ -n "$_gtmux_got" ]; then
+  # The gtmux installer drops the binary at ~/.local/bin/gtmux and handles
+  # release-asset mirrors itself. Record it so this installer's rollback removes it.
+  if bash "$_gtmux_script"; then
+    record_remove "$HOME/.local/bin/gtmux"
+  else
+    say_err "✗ gtmux install failed — see output above; re-run or install manually" \
+            "✗ gtmux 安装失败 —— 见上方输出;可重跑或手动安装"
+  fi
+elif command -v go >/dev/null 2>&1; then
+  say "⚠ couldn't fetch the gtmux installer — falling back to 'go install'" \
+      "⚠ 拉取 gtmux 安装器失败 —— 回退到 'go install'"
+  if GOBIN="$HOME/.local/bin" go install github.com/chenchaoyi/gtmux@latest; then
+    record_remove "$HOME/.local/bin/gtmux"
+  else
+    say_err "✗ go install gtmux failed — install manually: $_gtmux_raw" \
+            "✗ go install gtmux 失败 —— 请手动安装: $_gtmux_raw"
+  fi
 else
-  say "⚠ Go not found — gtmux not installed. Install Go (brew install go) and re-run." \
-      "⚠ 未找到 Go —— 未安装 gtmux。装 Go(brew install go)后重跑。"
+  say_err "⚠ gtmux not installed — no network for the installer and no Go. Run later:" \
+          "⚠ 未安装 gtmux —— 无法获取安装器且无 Go。稍后运行:"
+  say "    curl -fsSL $_gtmux_raw | bash" \
+      "    curl -fsSL $_gtmux_raw | bash"
 fi
+rm -f "$_gtmux_script" 2>/dev/null
 # Legacy CLIs folded into gtmux: back up and remove the old standalone names
 # (~/.local/bin/tmux-restore, ~/.local/bin/tmux-overview, ~/tmux-restore).
 # 旧的两个独立命令行已并入 gtmux:备份后移除旧名字。

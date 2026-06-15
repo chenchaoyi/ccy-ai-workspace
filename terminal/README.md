@@ -19,8 +19,8 @@ terminal/
 ├── tmux/
 │   ├── tmux.conf        tmux config (keeps default Ctrl+b prefix)
 │   └── cheatsheet.txt   quick reference shown by the prefix+g popup
-├── gtmux/              the gtmux CLI (Go): overview · agents · restore · focus
-│                          (install.sh builds it to ~/.local/bin/gtmux)
+│   (gtmux CLI now lives in its own repo: github.com/chenchaoyi/gtmux —
+│    install.sh installs it to ~/.local/bin/gtmux via its curl one-liner)
 ├── scripts/
 │   └── claude-notify    Claude Code hook: agent-done notification, click → exact pane (install.sh generates GtmuxFocus.app)
 ├── shell/
@@ -138,12 +138,19 @@ write side (`set-titles`) and the read side (`focus`) are one feature.
 `gtmux` is a command center for your tmux sessions and the coding agents running
 in them. One command, four verbs — **`overview`** (see sessions), **`agents`**
 (see who's working / idle / waiting on you), **`restore`** (rebuild your tabs),
-**`focus`** (jump to a tab/pane). It's a single Go binary (built by `install.sh`;
-needs the Go toolchain for now, prebuilt binaries once it's a standalone repo)
-invoked explicitly — no bashrc/zshrc hooks, works with any shell. Bare `gtmux`
-prints help (`gtmux --version` for the version);
-output language follows `--lang=en|zh` (default `en`) or `$GTMUX_LANG`;
-`gtmux --help` shows full usage.
+**`focus`** (jump to a tab/pane). It's a single Go binary, now maintained in its
+own repo — [github.com/chenchaoyi/gtmux](https://github.com/chenchaoyi/gtmux) —
+and installed via its curl one-liner (a prebuilt, checksum-verified binary;
+GitHub-first with a CN mirror fallback, no Go toolchain needed):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chenchaoyi/gtmux/main/install.sh | bash
+```
+
+`install.sh` runs this for you (step 3). It's invoked explicitly — no
+bashrc/zshrc hooks, works with any shell. Bare `gtmux` prints help
+(`gtmux --version` for the version); output language follows `--lang=en|zh`
+(default `en`) or `$GTMUX_LANG`; `gtmux --help` shows full usage.
 
 **How it's different.** Unlike agent *spawners* (claude-squad, uzi, dmux, …)
 that create and sandbox agents in git worktrees, gtmux doesn't run your agents

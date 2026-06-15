@@ -18,8 +18,8 @@ terminal/
 ├── tmux/
 │   ├── tmux.conf        tmux 配置(保留默认 Ctrl+b 前缀)
 │   └── cheatsheet.txt   前缀+g 弹窗显示的命令速查表
-├── gtmux/              gtmux 命令行(Go):overview · agents · restore · focus
-│                          (install.sh 编译到 ~/.local/bin/gtmux)
+│   (gtmux 命令行已拆成独立仓库:github.com/chenchaoyi/gtmux ——
+│    install.sh 用它的 curl 一行命令装到 ~/.local/bin/gtmux)
 ├── scripts/
 │   └── claude-notify    Claude Code 钩子:agent 完成弹通知,点击→ 确切 pane(install.sh 生成 GtmuxFocus.app)
 ├── shell/
@@ -128,10 +128,17 @@ tab 的原因 —— 写的一侧(`set-titles`)和读的一侧(`focus`)是同一
 
 `gtmux` 是你 tmux 会话、以及里面跑着的 coding agent 的指挥台。一个命令,四个动词 ——
 **`overview`**(看会话)、**`agents`**(看谁在跑 / 空闲 / 等你)、**`restore`**(重建 tab)、
-**`focus`**(跳到 tab/pane)。它是个单文件 Go 二进制(由 `install.sh` 编译,目前需要 Go
-工具链;抽成独立仓库后会有预编译二进制),显式调用、不碰 bashrc/zshrc,换什么 shell 都能用。
-不带参数直接敲 `gtmux` 显示帮助(`gtmux --version` 看版本);输出语言由 `--lang=en|zh`
-(默认 `en`)或 `$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
+**`focus`**(跳到 tab/pane)。它是个单文件 Go 二进制,现已拆成独立仓库 ——
+[github.com/chenchaoyi/gtmux](https://github.com/chenchaoyi/gtmux) —— 用它的 curl
+一行命令安装(预编译、经校验和验证的二进制;优先 GitHub,失败回退国内镜像,无需 Go 工具链):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chenchaoyi/gtmux/main/install.sh | bash
+```
+
+`install.sh`(第 3 步)会替你跑这条命令。它显式调用、不碰 bashrc/zshrc,换什么 shell
+都能用。不带参数直接敲 `gtmux` 显示帮助(`gtmux --version` 看版本);输出语言由
+`--lang=en|zh`(默认 `en`)或 `$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
 
 **它和别的不一样**:claude-squad、uzi、dmux 这类是 agent **spawner**——替你在 git
 worktree 里生成、隔离 agent;**gtmux 不替你跑 agent**,它是**覆盖你已经在 tmux 里跑的
