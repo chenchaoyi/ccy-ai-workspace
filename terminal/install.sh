@@ -380,7 +380,7 @@ if [ -n "$_gtmux_got" ]; then
 elif command -v go >/dev/null 2>&1; then
   say "⚠ couldn't fetch the gtmux installer — falling back to 'go install'" \
       "⚠ 拉取 gtmux 安装器失败 —— 回退到 'go install'"
-  if GOBIN="$HOME/.local/bin" go install github.com/chenchaoyi/gtmux@latest; then
+  if GOBIN="$HOME/.local/bin" go install github.com/chenchaoyi/gtmux/cmd/gtmux@latest; then
     record_remove "$HOME/.local/bin/gtmux"
   else
     say_err "✗ go install gtmux failed — install manually: $_gtmux_raw" \
