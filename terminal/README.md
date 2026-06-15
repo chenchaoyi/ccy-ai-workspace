@@ -145,6 +145,12 @@ prints help (`gtmux --version` for the version);
 output language follows `--lang=en|zh` (default `en`) or `$GTMUX_LANG`;
 `gtmux --help` shows full usage.
 
+**How it's different.** Unlike agent *spawners* (claude-squad, uzi, dmux, …)
+that create and sandbox agents in git worktrees, gtmux doesn't run your agents
+— it's the **radar + remote over whatever you already run in tmux**: see who's
+working / idle / waiting on you, and jump to the exact pane. Non-invasive and
+tmux-native; it even surfaces agents *other* tools spawned (they're in tmux too).
+
 ### `gtmux agents` — see your coding agents at a glance
 
 ```

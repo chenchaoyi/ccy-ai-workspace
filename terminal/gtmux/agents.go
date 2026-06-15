@@ -50,12 +50,30 @@ func loadProfiles() []agentProfile {
 
 type agentPane struct {
 	paneID   string
+	session  string
+	window   string // window index
+	pane     string // pane index
 	loc      string // session:window.pane
 	agent    string // display name, "" if unknown type
 	task     string // title with the status glyph stripped
-	status   string // "working" | "idle" | "running"
+	status   string // "working" | "waiting" | "idle" | "running"
 	activity bool
 	latest   bool // the most-recently-finished pane (claude-notify last-finished)
+}
+
+// agentJSON is the stable shape emitted by `gtmux agents --json` (for scripts
+// and the future menu-bar app — structured, no screen-scraping).
+type agentJSON struct {
+	PaneID   string `json:"pane_id"` // %N — jump target: gtmux focus <pane_id>
+	Session  string `json:"session"`
+	Window   string `json:"window"`
+	Pane     string `json:"pane"`
+	Loc      string `json:"loc"`
+	Agent    string `json:"agent"`
+	Status   string `json:"status"` // working | waiting | idle | running
+	Task     string `json:"task"`
+	Latest   bool   `json:"latest"`
+	Activity bool   `json:"activity"`
 }
 
 // isBrailleSpinner reports whether r is in the braille block (U+2800–U+28FF),
@@ -181,6 +199,9 @@ func gatherAgents() []agentPane {
 		}
 		panes = append(panes, agentPane{
 			paneID:   id,
+			session:  f[1],
+			window:   f[2],
+			pane:     f[3],
 			loc:      fmt.Sprintf("%s:%s.%s", f[1], f[2], f[3]),
 			agent:    agent,
 			task:     task,
@@ -252,9 +273,9 @@ func agentsSummary(panes []agentPane) string {
 	return s + " · " + strings.Join(parts, " · ")
 }
 
-// cmdAgents implements `gtmux agents [--watch] [--popup]`.
+// cmdAgents implements `gtmux agents [--watch] [--popup] [--json]`.
 func cmdAgents(args []string) int {
-	watch, popup := false, false
+	watch, popup, asJSON := false, false, false
 	for _, a := range args {
 		switch a {
 		case "-h", "--help":
@@ -264,11 +285,20 @@ func cmdAgents(args []string) int {
 			watch = true
 		case "--popup":
 			popup = true // close the TUI after a jump (used by the prefix+a popup)
+		case "--json":
+			asJSON = true
 		}
 	}
 	if !tmuxServerUp() {
+		if asJSON {
+			fmt.Println("[]")
+			return 0
+		}
 		say("No tmux server running", "没有运行中的 tmux server")
 		return 1
+	}
+	if asJSON {
+		return agentsJSON()
 	}
 	if watch {
 		return runWatch(popup)
@@ -304,6 +334,27 @@ func cmdAgents(args []string) int {
 	fmt.Printf("\n%s%s%s\n", cDim,
 		tr("jump: gtmux focus <pane>   (e.g. gtmux focus "+panes[0].paneID+")",
 			"跳转: gtmux focus <pane>   (例如 gtmux focus "+panes[0].paneID+")"), cReset)
+	return 0
+}
+
+// agentsJSON prints the live agents as a JSON array (stable shape; no colors,
+// no screen-scraping — for scripts and the menu-bar app).
+func agentsJSON() int {
+	panes := gatherAgents()
+	out := make([]agentJSON, 0, len(panes))
+	for _, p := range panes {
+		out = append(out, agentJSON{
+			PaneID: p.paneID, Session: p.session, Window: p.window, Pane: p.pane,
+			Loc: p.loc, Agent: p.agent, Status: p.status, Task: p.task,
+			Latest: p.latest, Activity: p.activity,
+		})
+	}
+	b, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		sae("json error: "+err.Error(), "json 错误: "+err.Error())
+		return 1
+	}
+	fmt.Println(string(b))
 	return 0
 }
 

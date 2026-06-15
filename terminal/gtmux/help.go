@@ -9,9 +9,10 @@ const usageEN = `Usage:
 Commands:
   overview [--popup]      sessions / windows / panes summary
                           --popup is what prefix+g opens
-  agents [--watch]        coding agents across your panes: waiting / working /
+  agents [--watch|--json] coding agents across your panes: waiting / working /
                           idle, where, and the pane id to jump to. --watch is a
-                          live dashboard (↑/↓ select · enter jump · r · q)
+                          live dashboard (↑/↓ select · enter jump · r · q);
+                          --json prints a structured array (for scripts/apps)
   restore                 one Ghostty tab per session, attach all
     restore --pick|-p     list & choose (numbers / Enter=all / q=cancel)
     restore <name>        attach that session by name in THIS tab
@@ -43,9 +44,10 @@ const usageZH = `用法:
 命令:
   overview [--popup]      session / window / pane 汇总
                           --popup 就是 prefix+g 弹的那个弹窗
-  agents [--watch]        各 pane 里的 coding agent:等输入 / 运行中 / 空闲、
+  agents [--watch|--json] 各 pane 里的 coding agent:等输入 / 运行中 / 空闲、
                           在哪、以及可跳转的 pane id。--watch 是实时面板
-                          (↑/↓ 选择 · enter 跳转 · r 刷新 · q 退出)
+                          (↑/↓ 选择 · enter 跳转 · r 刷新 · q 退出);
+                          --json 输出结构化数组(给脚本/app 用)
   restore                 每个 session 一个 Ghostty tab,全部接回
     restore --pick|-p     列出来选(编号 / 回车=全部 / q=取消)
     restore <名字>         按名字把当前 tab 接回指定 session

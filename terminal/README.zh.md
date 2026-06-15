@@ -133,7 +133,10 @@ tab 的原因 —— 写的一侧(`set-titles`)和读的一侧(`focus`)是同一
 不带参数直接敲 `gtmux` 显示帮助(`gtmux --version` 看版本);输出语言由 `--lang=en|zh`
 (默认 `en`)或 `$GTMUX_LANG` 控制;`gtmux --help` 看完整用法。
 
-### `gtmux agents` —— 一眼看清你的 coding agent
+**它和别的不一样**:claude-squad、uzi、dmux 这类是 agent **spawner**——替你在 git
+worktree 里生成、隔离 agent;**gtmux 不替你跑 agent**,它是**覆盖你已经在 tmux 里跑的
+一切的"雷达 + 遥控器"**:看清谁在跑 / 空闲 / 等你,并跳到确切 pane。非侵入、tmux 原生,
+连别的工具生成的 agent 也能照看到(它们也在 tmux 里)。
 
 ```
 gtmux agent — 6 agent · 1 运行中 · 5 空闲
