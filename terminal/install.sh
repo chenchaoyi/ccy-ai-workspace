@@ -500,179 +500,108 @@ if ! infocmp tmux-256color >/dev/null 2>&1; then
 fi
 
 # ---- 7) Claude Code agent-done notifications (optional) --------------------
-# Desktop notification when an agent finishes in any tmux session. With
-# terminal-notifier it is CLICKABLE — the click runs `gtmux focus` to land on
-# the right Ghostty tab; without it, a reliable but non-clickable native banner.
-# Self-contained (no plugin dependency). Opt-in because it edits
-# ~/.claude/settings.json (a different tool's config).
-# "agent 完成"桌面通知:任意 tmux session 里 agent 跑完即弹。装了 terminal-notifier
-# 则【可点击】—— 点击跑 `gtmux focus` 跳到对应 Ghostty tab;没装则是可靠但不可点击的
-# 原生通知。自包含(不依赖插件)。opt-in,因为它要改 ~/.claude/settings.json(别的工具的配置)。
+# Desktop notification when an agent finishes in any tmux session, with a click
+# that jumps to its exact Ghostty tab/pane. This is now provided by gtmux itself:
+# `gtmux hook` writes the agent state + fires the notification, and
+# `gtmux install-hooks` registers it (Stop/Notification/UserPromptSubmit) and
+# generates the GtmuxFocus.app click target. Opt-in (edits ~/.claude/settings.json).
+# Replaces the old bash claude-notify hook, which is migrated away below.
+# "agent 完成"桌面通知 + 点击直达确切 Ghostty tab/pane,现已由 gtmux 自带:
+# `gtmux hook` 写状态并发通知,`gtmux install-hooks` 注册钩子(Stop/Notification/
+# UserPromptSubmit)并生成点击落点 GtmuxFocus.app。opt-in(要改 ~/.claude/settings.json)。
+# 取代旧的 bash claude-notify(下面会自动迁移掉)。
 say "== 7/7 Claude Code notifications (optional) ==" "== 7/7 Claude Code 完成通知(可选)=="
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS="$CLAUDE_DIR/settings.json"
+GTMUX_BIN="$HOME/.local/bin/gtmux"
 if [ ! -d "$CLAUDE_DIR" ]; then
   say "ℹ Claude Code not detected (~/.claude absent) — skipping notification setup" \
       "ℹ 未检测到 Claude Code(无 ~/.claude)—— 跳过通知设置"
+elif [ ! -x "$GTMUX_BIN" ]; then
+  say "⚠ gtmux not installed — skipping notifications (re-run after gtmux is installed)" \
+      "⚠ 未安装 gtmux —— 跳过通知(gtmux 装好后重跑本脚本)"
 elif confirm "Enable 'agent finished' desktop notifications? [y/N] " \
              "启用「agent 完成」桌面通知吗?[y/N] "; then
-  # 7a) Install the hook script
-  install_file "$DIR/scripts/claude-notify" "$HOME/.local/bin/claude-notify"
-  chmod +x "$HOME/.local/bin/claude-notify"
-  # Cache a Claude icon for the notification's right-side image (best-effort;
-  # terminal-notifier's -contentImage needs a raster file, and the LEFT app icon
-  # can't be overridden on modern macOS). Skipped silently if Claude.app/sips absent.
-  # 为通知右侧小图缓存一张 Claude 图标(尽力而为;-contentImage 需要位图文件,左侧主图标
-  # 在新版 macOS 改不了)。没有 Claude.app 或 sips 就静默跳过。
-  _claude_icns="/Applications/Claude.app/Contents/Resources/electron.icns"
-  if [ -f "$_claude_icns" ] && command -v sips >/dev/null 2>&1; then
-    mkdir -p "$HOME/.local/share/gtmux"
-    if sips -s format png -Z 256 "$_claude_icns" --out "$HOME/.local/share/gtmux/notify-icon.png" >/dev/null 2>&1; then
-      record_remove "$HOME/.local/share/gtmux/notify-icon.png"
-      say "✓ cached Claude notification icon" "✓ 已缓存 Claude 通知图标"
-    fi
-  fi
-  # GtmuxFocus.app — the click target. On modern macOS only -activate (bring an
-  # app forward) works on a notification click, not -execute (run a command). So
-  # the notification -activates this 2-file app bundle, whose executable reads
-  # last-finished and runs `gtmux focus` — that's how one click reaches the exact
-  # tab. Registered with Launch Services so -activate resolves it by bundle id.
-  # GtmuxFocus.app —— 点击的落点。新版 macOS 上通知点击只有 -activate(把某 app 切前台)能用,
-  # -execute(跑命令)不行。于是通知 -activate 这个两文件的 app,它读 last-finished 跑
-  # `gtmux focus` —— 一键就到具体 tab。用 Launch Services 注册,-activate 才能按 bundle id 找到。
-  GFAPP="$HOME/Applications/GtmuxFocus.app"
-  mkdir -p "$GFAPP/Contents/MacOS"
-  cat > "$GFAPP/Contents/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleIdentifier</key><string>com.gtmux.focus</string>
-  <key>CFBundleName</key><string>GtmuxFocus</string>
-  <key>CFBundleExecutable</key><string>run</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>LSUIElement</key><true/>
-</dict>
-</plist>
-PLIST
-  cat > "$GFAPP/Contents/MacOS/run" <<'RUNSH'
-#!/bin/bash
-# Click target for claude-notify: jump to the session that most recently finished.
-f=$(cat "$HOME/.local/share/gtmux/last-finished" 2>/dev/null)
-[ -n "$f" ] && "$HOME/.local/bin/gtmux" focus "$f"
-RUNSH
-  chmod +x "$GFAPP/Contents/MacOS/run"
-  _lsreg="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-  [ -x "$_lsreg" ] && "$_lsreg" -f "$GFAPP" 2>/dev/null
-  printf 'rm -rf %q && echo "  %s: %s"\n' "$GFAPP" "$R_REMOVED" "$GFAPP" >> "$ROLLBACK"
-  say "✓ installed GtmuxFocus.app (notification click → jump to tab)" \
-      "✓ 已安装 GtmuxFocus.app(通知点击 → 跳到对应 tab)"
-  say "  first click prompts 'GtmuxFocus wants to control Ghostty' — allow it once" \
-      "  首次点击会弹「GtmuxFocus 想要控制 Ghostty」,允许一次即可"
-
-  # 7b) Notifier: terminal-notifier makes the notification CLICKABLE (click →
-  # gtmux focus). Without it the hook still notifies, just not clickable, so
-  # strongly recommend installing it.
-  # 7b) 通知器:terminal-notifier 让通知【可点击】(点击→ gtmux focus)。没装也能弹,
-  # 只是不可点,所以强烈建议装上。
-  if command -v terminal-notifier >/dev/null 2>&1; then
-    say "✓ terminal-notifier found — notifications will be native & clickable" \
-        "✓ 已找到 terminal-notifier —— 通知将是原生且可点击"
-  elif command -v brew >/dev/null 2>&1; then
-    # Click-through is the point of this feature, so default to installing it
-    # (Enter = yes). Decline with 'n' to keep the non-clickable native banner.
-    # 点击直达是这功能的核心,所以默认装(回车=是)。按 n 则保留不可点击的原生通知。
-    say "ℹ terminal-notifier makes the notification clickable (click → jump to tab)." \
-        "ℹ terminal-notifier 让通知可点击(点击→跳到对应 tab)。"
-    if confirm_yes "  Install it now via Homebrew? [Y/n] " \
-                   "  现在用 Homebrew 装上吗?[Y/n] "; then
-      brew install terminal-notifier \
-        && say "✓ terminal-notifier installed — notifications will be clickable" \
-               "✓ 已装 terminal-notifier —— 通知将可点击" \
-        || say "  ⚠ install failed — notifications still work (not clickable)" \
-               "  ⚠ 安装失败 —— 通知仍可用(不可点击)"
-    else
-      say "  skipped — notifications will work but not be clickable (later: brew install terminal-notifier)" \
-          "  已跳过 —— 通知可用但不可点击(稍后可: brew install terminal-notifier)"
-    fi
-  else
-    say "ℹ No Homebrew found — notifications will work but NOT be clickable (later: brew install terminal-notifier)" \
-        "ℹ 未找到 Homebrew —— 通知可用但【不可点击】(稍后可: brew install terminal-notifier)"
-  fi
-
-  # 7c) Register the hook in settings.json (backed up; idempotent; preserves others)
+  # Back up settings.json (and peon config) up front so rollback restores the
+  # exact pre-install state — `gtmux install-hooks --yes` mutates both.
+  # 先备份 settings.json(及 peon 配置),让回滚能还原到安装前 —— install-hooks --yes 会改它们。
   if [ -f "$SETTINGS" ]; then
     sbak="$(safe_backup "$SETTINGS")"; record_restore "$SETTINGS" "$sbak"
   else
     record_remove "$SETTINGS"
   fi
-  merged="$(python3 - "$SETTINGS" "$HOME/.local/bin/claude-notify" <<'PY'
-import json, sys, os
-path, cmd = sys.argv[1], sys.argv[2]
-try:
-    with open(path) as f: cfg = json.load(f)
-except Exception:
-    cfg = {}
-hooks = cfg.setdefault('hooks', {})
-changed = False
-for event in ('Stop', 'Notification', 'UserPromptSubmit'):
-    groups = hooks.setdefault(event, [])
-    present = any(
-        isinstance(h, dict) and h.get('command') == cmd
-        for g in groups if isinstance(g, dict)
-        for h in (g.get('hooks') or []))
-    if not present:
-        groups.append({'matcher': '', 'hooks': [
-            {'type': 'command', 'command': cmd, 'async': True}]})
-        changed = True
-if changed:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f: json.dump(cfg, f, indent=2)
-print('changed' if changed else 'nochange')
-PY
-)" || merged="error"
-  case "$merged" in
-    changed)  say "✓ hook registered in settings.json (Stop + Notification + UserPromptSubmit)" \
-                  "✓ 已注册到 settings.json(Stop + Notification + UserPromptSubmit)";;
-    nochange) say "✓ hook already registered in settings.json" \
-                  "✓ settings.json 中已注册,无需改动";;
-    *)        say "⚠ could not edit settings.json — add claude-notify to Stop/Notification by hand" \
-                  "⚠ 无法编辑 settings.json —— 请手动把 claude-notify 加到 Stop/Notification";;
-  esac
-
-  # 7d) Coexist with peon-ping: avoid double-fire + tab-title conflict with set-titles
   PEON_CFG="$CLAUDE_DIR/hooks/peon-ping/config.json"
   if [ -f "$PEON_CFG" ]; then
-    if confirm "Detected peon-ping. Disable its desktop notifications + tab-title to avoid conflicts? [y/N] " \
-               "检测到 peon-ping。关掉它的桌面通知和 tab 标题以免冲突(双弹/抢标题)吗?[y/N] "; then
-      pbak="$(safe_backup "$PEON_CFG")"; record_restore "$PEON_CFG" "$pbak"
-      if python3 - "$PEON_CFG" <<'PY'
+    pbak="$(safe_backup "$PEON_CFG")"; record_restore "$PEON_CFG" "$pbak"
+  fi
+
+  # Migrate off the old bash claude-notify: drop its hook entries + binary so we
+  # don't double-fire (install-hooks dedupes on basename 'gtmux', not the old
+  # script name). safe_backup keeps rollback intact.
+  # 迁移掉旧的 bash claude-notify:删掉它的 hook 条目和二进制,避免双弹
+  #(install-hooks 按 basename 'gtmux' 去重,认不出旧脚本名)。备份后再删,回滚不受影响。
+  if [ -f "$HOME/.local/bin/claude-notify" ]; then
+    cnbak="$(safe_backup "$HOME/.local/bin/claude-notify")"
+    record_restore "$HOME/.local/bin/claude-notify" "$cnbak"
+    rm -f "$HOME/.local/bin/claude-notify"
+    if [ -f "$SETTINGS" ]; then
+      python3 - "$SETTINGS" <<'PY' || true
 import json, sys
 p = sys.argv[1]
 try:
-    c = json.load(open(p))
+    cfg = json.load(open(p))
 except Exception:
-    c = {}
-c['desktop_notifications'] = False   # we own notifications now
-c['terminal_tab_title']   = False    # set-titles owns the tab title (gtmux focus needs it)
-json.dump(c, open(p, 'w'), indent=2)
+    sys.exit(0)
+hooks = cfg.get('hooks', {})
+for ev, groups in list(hooks.items()):
+    kept = []
+    for g in groups:
+        if not isinstance(g, dict):
+            kept.append(g); continue
+        hs = [h for h in (g.get('hooks') or [])
+              if 'claude-notify' not in ((h or {}).get('command') or '')]
+        if hs:
+            g['hooks'] = hs; kept.append(g)
+    if kept:
+        hooks[ev] = kept
+    else:
+        del hooks[ev]
+json.dump(cfg, open(p, 'w'), indent=2)
 PY
-      then
-        say "✓ peon-ping: desktop_notifications + terminal_tab_title disabled (sounds still on)" \
-            "✓ peon-ping:已关桌面通知与 tab 标题(音效保留)"
-      else
-        say "⚠ could not edit peon-ping config — disable its desktop_notifications by hand" \
-            "⚠ 无法编辑 peon-ping 配置 —— 请手动关掉它的 desktop_notifications"
-      fi
-    else
-      say "ℹ Left peon-ping as-is — you may get double notifications until you disable its desktop_notifications" \
-          "ℹ peon-ping 保持原样 —— 在你关掉它的 desktop_notifications 前可能会双弹"
+    fi
+    say "↪ migrated off bash claude-notify → now via 'gtmux hook' (backup: $cnbak)" \
+        "↪ 已从 bash claude-notify 迁移 → 改用 'gtmux hook'(备份: $cnbak)"
+  fi
+
+  # terminal-notifier makes the notification clickable (click → exact pane).
+  # Install by default since click-through is the point; decline keeps a plain banner.
+  # terminal-notifier 让通知可点击(点击→确切 pane)。点击直达是核心,所以默认装;按 n 则普通通知。
+  if ! command -v terminal-notifier >/dev/null 2>&1 && command -v brew >/dev/null 2>&1; then
+    if confirm_yes "  Install terminal-notifier (clickable notifications) via Homebrew? [Y/n] " \
+                   "  用 Homebrew 装 terminal-notifier(可点击通知)吗?[Y/n] "; then
+      brew install terminal-notifier \
+        && say "✓ terminal-notifier installed" "✓ 已装 terminal-notifier" \
+        || say "  ⚠ install failed — notifications still work (not clickable)" \
+               "  ⚠ 安装失败 —— 通知仍可用(不可点击)"
     fi
   fi
 
-  say "→ Reload: restart Claude Code (or run /hooks) so the new hook takes effect." \
-      "→ 生效:重启 Claude Code(或执行 /hooks)让新钩子加载。"
+  # Hand off to gtmux: generates GtmuxFocus.app + caches the icon + registers the
+  # hook on Stop/Notification/UserPromptSubmit, and (--yes) quiets peon-ping.
+  # 交给 gtmux:生成 GtmuxFocus.app + 缓存图标 + 注册 hook,并(--yes)关掉 peon 的通知/标题。
+  if "$GTMUX_BIN" install-hooks --yes; then
+    record_remove "$HOME/.local/share/gtmux/notify-icon.png"
+    printf 'rm -rf %q && echo "  %s: %s"\n' "$HOME/Applications/GtmuxFocus.app" "$R_REMOVED" "$HOME/Applications/GtmuxFocus.app" >> "$ROLLBACK"
+    say "✓ notifications enabled via gtmux (click → jump to the exact pane)" \
+        "✓ 已由 gtmux 启用通知(点击 → 跳到确切 pane)"
+    say "  first click prompts 'GtmuxFocus wants to control Ghostty' — allow it once" \
+        "  首次点击会弹「GtmuxFocus 想要控制 Ghostty」,允许一次即可"
+    say "→ Reload: restart Claude Code (or run /hooks) so the new hook takes effect." \
+        "→ 生效:重启 Claude Code(或执行 /hooks)让新钩子加载。"
+  else
+    say "⚠ 'gtmux install-hooks' failed — notifications not enabled (try: gtmux install-hooks)" \
+        "⚠ 'gtmux install-hooks' 失败 —— 通知未启用(可手动: gtmux install-hooks)"
+  fi
 else
   say "ℹ Skipped. Re-run this installer anytime to enable agent-done notifications." \
       "ℹ 已跳过。想启用「agent 完成」通知随时重跑本安装脚本即可。"

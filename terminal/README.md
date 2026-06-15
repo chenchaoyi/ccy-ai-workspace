@@ -21,8 +21,8 @@ terminal/
 │   └── cheatsheet.txt   quick reference shown by the prefix+g popup
 │   (gtmux CLI now lives in its own repo: github.com/chenchaoyi/gtmux —
 │    install.sh installs it to ~/.local/bin/gtmux via its curl one-liner)
-├── scripts/
-│   └── claude-notify    Claude Code hook: agent-done notification, click → exact pane (install.sh generates GtmuxFocus.app)
+│   (agent-done notifications + click→exact-pane are provided by gtmux's own
+│    hook; install.sh enables them via `gtmux install-hooks`)
 ├── shell/
 │   └── ghostty-cwd.bash cwd reporting for macOS bash 3.2 (new windows inherit cwd)
 └── docs/
@@ -165,8 +165,9 @@ gtmux is just a CLI; the bindings below live in this repo's `tmux/tmux.conf`
 After a Ghostty restart, run **`gtmux restore`** once in any tab to reattach
 every tmux session to its own tab (after a reboot it also boots tmux and waits
 for tmux-continuum — configured in `tmux.conf` — to restore the last autosave).
-The `⏸ waiting` / `✓ latest` agent signals and click-to-jump notifications are
-produced by this repo's `claude-notify` hook (see the next section).
+The `⏸ waiting` / `✓ latest` agent signals and click-to-jump notifications come
+from gtmux's own hook, which `install.sh` enables via `gtmux install-hooks` (see
+the next section).
 
 See the [gtmux repo README](https://github.com/chenchaoyi/gtmux#readme) for the
 full per-command docs (agent detection & `agents.json`, restore modes, `--json`,
@@ -174,37 +175,31 @@ mirror options, etc.).
 
 ## Agent-done notifications that click through to the exact pane (Claude Code)
 
-Without tmux, Ghostty shows a native notification when a Claude Code agent
-finishes and clicking it jumps to that tab. **Under tmux that path is dead** —
-tmux drops the bare notification escape. `claude-notify` (a Claude Code hook
-installed by `install.sh`) restores it — and lands on the **exact pane** the
-agent ran in — peon-independent:
+Without tmux, Ghostty natively notifies when a Claude Code agent finishes and a
+click jumps to its tab. **Under tmux that path is dead** — tmux drops the bare
+notification escape. gtmux restores it (and lands on the **exact pane**) via its
+built-in hook, which `install.sh` (step 7) enables for you with
+**`gtmux install-hooks --yes`** — opt-in, since it edits `~/.claude/settings.json`
+(backed up + idempotent, your other hooks preserved):
 
-- Fires a desktop notification when an agent finishes in **any** tmux
-  session — including ones you aren't looking at — and **stays silent when
-  you're already watching that session's Ghostty tab**.
-- **Clicking the notification jumps straight to the precise pane** the agent ran
-  in: it selects that window + pane inside the tmux session and brings the
-  Ghostty tab forward.
-- The **`-activate` trick**: on modern macOS (26.x) a notification click can
-  only *activate an app* — running a command on click (`-execute`) is silently
-  broken. So the click `-activate`s a tiny helper app, **`GtmuxFocus.app`**
-  (2 files, generated + Launch-Services-registered by `install.sh`), whose only
-  job is to read the finished pane id from `~/.local/share/gtmux/last-finished`
-  and run `gtmux focus <pane>`. First click prompts *"GtmuxFocus wants to
+- A desktop notification fires when an agent finishes in **any** tmux session —
+  including ones you aren't looking at — and **stays silent while you're already
+  watching that session's Ghostty tab**.
+- **Clicking it jumps straight to the precise pane.** gtmux generates a tiny
+  helper app, **`GtmuxFocus.app`**, as the click target (on modern macOS a click
+  can only *activate an app*, not run a command), which runs `gtmux focus --last`
+  to land on the just-finished pane. First click prompts *"GtmuxFocus wants to
   control Ghostty"* — allow it once.
-- **`prefix + J`** does the same jump from the keyboard (handy when you're
-  already in Ghostty — no need to touch the notification).
-- The notifier is **`terminal-notifier`** (the installer `brew install`s it by
-  default, Enter to accept). Without it you still get a reliable native banner,
-  just not clickable.
-- Self-contained — no plugin dependency. If peon-ping is present, the installer
-  offers to silence peon's own desktop notifications (and `terminal_tab_title`)
-  so you don't get double banners or a title fight with `set-titles`.
+- **`prefix + J`** does the same jump from the keyboard.
+- `terminal-notifier` makes the notification clickable — `install.sh` offers to
+  `brew install` it (Enter to accept); without it you still get a plain banner.
+- If peon-ping is present, `install.sh` silences peon's own desktop
+  notifications (and `terminal_tab_title`) so you don't get double banners or a
+  title fight with `set-titles`.
 
-It's **opt-in**: `install.sh`'s last step asks before enabling it, because
-wiring it edits `~/.claude/settings.json` (backed up, idempotent, your other
-hooks preserved). Run the installer again anytime to turn it on.
+The hook itself (`gtmux hook`), the state files under `~/.local/share/gtmux/`,
+and the notifier internals live in the [gtmux repo](https://github.com/chenchaoyi/gtmux);
+`gtmux uninstall-hooks` reverses the setup.
 
 ## Working-directory inheritance (new windows/tabs keep your cwd)
 
@@ -233,7 +228,7 @@ Ghostty sees the real directory even when you live in tmux.
 | Tab naming | name sessions/windows in tmux; **`set-titles` mirrors them onto Ghostty tabs** | titles live in the state layer — survive quit/reboot, auto-correct after `gtmux restore`, zero manual renaming |
 | Workspace CLI | **one `gtmux`** (Go): `overview` · `agents` · `restore` · `focus` | one command for the whole workspace + multi-agent status; `--lang=en|zh` |
 | What's running? | **prefix+g** session overview popup (also `gtmux overview` in any shell) | counts + per-session windows/panes at a glance |
-| Agent-done alerts | **`claude-notify`** hook: notify on finish, **click → exact pane** (via `GtmuxFocus.app` + `-activate`); also `prefix+J` | restores Ghostty's click-through that tmux kills, lands on the precise pane; quiet when you're watching; peon-independent |
+| Agent-done alerts | gtmux's hook (`gtmux install-hooks`): notify on finish, **click → exact pane** (via `GtmuxFocus.app`); also `prefix+J` | restores Ghostty's click-through that tmux kills, lands on the precise pane; quiet when you're watching; peon-independent |
 | Forgot a key? | **prefix+G** cheatsheet popup; prefix+? full list; prefix+/ then a key explains it | look it up without leaving tmux |
 | Parallel agents | one session per project, tasks per window | see docs/04 |
 
