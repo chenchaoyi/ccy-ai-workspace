@@ -169,6 +169,12 @@ The `⏸ waiting` / `✓ latest` agent signals and click-to-jump notifications c
 from gtmux's own hook, which `install.sh` enables via `gtmux install-hooks` (see
 the next section).
 
+**Menu-bar app (optional).** `install.sh` (step 8) also offers to install
+**`Gtmux.app`** — a macOS status-bar icon showing live agent state (⏸ waiting /
+⠿ working / ✳ idle + a count), click a row to jump to that pane. It's the GUI
+form of `gtmux agents`, consuming the same data. Manage it with
+`gtmux install-app [--login]` / `gtmux uninstall-app`.
+
 See the [gtmux repo README](https://github.com/chenchaoyi/gtmux#readme) for the
 full per-command docs (agent detection & `agents.json`, restore modes, `--json`,
 mirror options, etc.).

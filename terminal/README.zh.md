@@ -155,6 +155,11 @@ Ghostty 重启后,在任意 tab 里跑一次 **`gtmux restore`**,把每个 tmux 
 最近一次存档)。`⏸ 等输入` / `✓ latest` 这些 agent 信号、以及点击直达的通知,都来自 gtmux
 自带的 hook —— `install.sh` 通过 `gtmux install-hooks` 启用(见下一节)。
 
+**菜单栏 app(可选)**:`install.sh`(第 8 步)还会询问是否安装 **`Gtmux.app`** ——
+一个 macOS 状态栏图标,实时显示 agent 状态(⏸ 等你 / ⠿ 运行中 / ✳ 空闲 + 计数),点某行就
+跳到那个 pane。它是 `gtmux agents` 的 GUI 形态,数据同源。用 `gtmux install-app [--login]` /
+`gtmux uninstall-app` 管理。
+
 完整的逐命令文档(agent 检测与 `agents.json`、restore 各模式、`--json`、镜像选项等)见
 [gtmux 仓库 README](https://github.com/chenchaoyi/gtmux/blob/main/README.zh.md)。
 

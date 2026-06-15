@@ -13,6 +13,8 @@
 #                            installed via github.com/chenchaoyi/gtmux curl one-liner
 #   - cwd reporter        -> ~/.ghostty-cwd.bash (for macOS bash 3.2)
 #   - tpm + tmux plugins (headless, no prefix+I needed)
+#   - Claude Code notifications (optional) -> gtmux install-hooks
+#   - gtmux menu-bar app   (optional) -> ~/Applications/Gtmux.app (macOS)
 #
 # SAFETY / 安全:
 #   - Every replaced/removed file is backed up under
@@ -321,7 +323,7 @@ fi
 say "  backups + rollback: $BACKUP_DIR" "  备份与回滚: $BACKUP_DIR"
 
 # ---- 1) Ghostty config / Ghostty 配置 -------------------------------------
-say "== 1/7 Ghostty config ==" "== 1/7 Ghostty 配置 =="
+say "== 1/8 Ghostty config ==" "== 1/8 Ghostty 配置 =="
 install_file "$DIR/ghostty/config" "$HOME/.config/ghostty/config"
 # Legacy non-standard config.ghostty: back it up and disable to avoid double-load
 # 旧的非标准 config.ghostty:备份并停用,避免与新配置重复加载
@@ -336,7 +338,7 @@ if [ -e "$LEGACY" ]; then
 fi
 
 # ---- 2) tmux config + cheatsheet / tmux 配置 + 速查表 -----------------------
-say "== 2/7 tmux config ==" "== 2/7 tmux 配置 =="
+say "== 2/8 tmux config ==" "== 2/8 tmux 配置 =="
 install_file "$DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
 # Quick-reference shown by the prefix+g popup / 前缀+g 弹窗显示的速查表
 install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
@@ -348,7 +350,7 @@ install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
 # 安装到 PATH(~/.local/bin)的独立命令行,与 shell 配置无关。一个命令三个动词:
 # `gtmux restore`(一键接回全部 session)、`gtmux overview`(前缀+g 弹窗,也可直接跑)、
 # `gtmux focus <名字>`(跳到对应 tab)。
-say "== 3/7 CLI tool (gtmux) ==" "== 3/7 命令行工具(gtmux)=="
+say "== 3/8 CLI tool (gtmux) ==" "== 3/8 命令行工具(gtmux)=="
 # gtmux now lives in its own repo (github.com/chenchaoyi/gtmux) and is installed
 # via its curl one-liner, which fetches a prebuilt, checksum-verified binary
 # (GitHub-first, with a CN mirror-chain fallback). No local Go toolchain needed.
@@ -428,11 +430,11 @@ esac
 # macOS 自带 /bin/bash(3.2)没有 Ghostty 自动 shell 集成,新窗口/新 tab 无法
 # 继承工作目录。该片段补上最小化 OSC 7 上报(tmux 内同样生效)。bash 用户在
 # .bashrc 里 source 它 —— 见结尾说明。
-say "== 4/7 cwd reporter ==" "== 4/7 目录上报片段 =="
+say "== 4/8 cwd reporter ==" "== 4/8 目录上报片段 =="
 install_file "$DIR/shell/ghostty-cwd.bash" "$HOME/.ghostty-cwd.bash"
 
 # ---- 5) tpm (non-fatal) / tpm(失败不致命)--------------------------------
-say "== 5/7 tpm (tmux plugin manager) ==" "== 5/7 tpm(tmux 插件管理器)=="
+say "== 5/8 tpm (tmux plugin manager) ==" "== 5/8 tpm(tmux 插件管理器)=="
 TPM="$HOME/.tmux/plugins/tpm"
 PLUGINS_DIR="$HOME/.tmux/plugins"
 FRESH_TPM=0
@@ -458,7 +460,7 @@ fi
 # No need to press prefix+I by hand — installed here via an ISOLATED tmux server
 # (-L socket) so your running tmux, if any, is never touched.
 # 不用手动按 前缀+I —— 这里用【独立 socket 的 tmux server】自动装好,绝不碰你正在跑的 tmux。
-say "== 6/7 tmux plugins ==" "== 6/7 tmux 插件 =="
+say "== 6/8 tmux plugins ==" "== 6/8 tmux 插件 =="
 if [ -x "$TPM/bin/install_plugins" ] && command -v tmux >/dev/null 2>&1; then
   NEW_PLUGINS=""
   for p in tmux-resurrect tmux-continuum; do
@@ -510,7 +512,7 @@ fi
 # `gtmux hook` 写状态并发通知,`gtmux install-hooks` 注册钩子(Stop/Notification/
 # UserPromptSubmit)并生成点击落点 GtmuxFocus.app。opt-in(要改 ~/.claude/settings.json)。
 # 取代旧的 bash claude-notify(下面会自动迁移掉)。
-say "== 7/7 Claude Code notifications (optional) ==" "== 7/7 Claude Code 完成通知(可选)=="
+say "== 7/8 Claude Code notifications (optional) ==" "== 7/8 Claude Code 完成通知(可选)=="
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS="$CLAUDE_DIR/settings.json"
 GTMUX_BIN="$HOME/.local/bin/gtmux"
@@ -605,6 +607,62 @@ PY
 else
   say "ℹ Skipped. Re-run this installer anytime to enable agent-done notifications." \
       "ℹ 已跳过。想启用「agent 完成」通知随时重跑本安装脚本即可。"
+fi
+
+# ---- 8) gtmux menu-bar app (optional, macOS) ------------------------------
+# Gtmux.app — a status-bar app showing live agent state (⏸ waiting / ⠿ working /
+# ✳ idle) with a count, click a row to jump to that pane. It's a universal,
+# ad-hoc-signed .app shipped as a zip on the gtmux release (separate from the
+# cgo-free CLI). Opt-in; macOS only (it's a .app). Downloaded GitHub-first with a
+# CN mirror fallback, matching the CLI's installed version.
+# Gtmux.app —— 菜单栏状态栏 app:实时显示 agent 状态(⏸ 等你 / ⠿ 运行中 / ✳ 空闲)+ 计数,
+# 点某行就跳到那个 pane。它是 gtmux 发布里附带的 universal、ad-hoc 签名 .app(zip,独立于
+# cgo-free 的 CLI)。opt-in;仅 macOS。优先 GitHub、失败走国内镜像,版本与已装 CLI 对齐。
+say "== 8/8 gtmux menu-bar app (optional) ==" "== 8/8 gtmux 菜单栏 app(可选)=="
+if [ "$(uname -s)" != "Darwin" ]; then
+  say "ℹ Not macOS — skipping the menu-bar app" "ℹ 非 macOS —— 跳过菜单栏 app"
+elif [ ! -x "$HOME/.local/bin/gtmux" ]; then
+  say "⚠ gtmux not installed — skipping the menu-bar app" "⚠ 未安装 gtmux —— 跳过菜单栏 app"
+elif confirm "Install the gtmux menu-bar app (Gtmux.app)? [y/N] " \
+             "安装 gtmux 菜单栏 app(Gtmux.app)吗?[y/N] "; then
+  _gver="$("$HOME/.local/bin/gtmux" --version 2>/dev/null | awk '{print $2}')"
+  if [ -z "$_gver" ]; then
+    say_err "⚠ couldn't determine gtmux version — skipping app (later: gtmux install-app)" \
+            "⚠ 无法确定 gtmux 版本 —— 跳过 app(之后可: gtmux install-app)"
+  else
+    _zip="Gtmux-${_gver}-macos.zip"
+    _url="https://github.com/chenchaoyi/gtmux/releases/download/v${_gver}/${_zip}"
+    _tmpd="$(mktemp -d)"; _tmpzip="$_tmpd/$_zip"; _got=""
+    # Same direct→mirror fallback the CLI installer uses (GitHub assets stall on CN).
+    for _pre in "" "https://ghfast.top/" "https://gh-proxy.com/"; do
+      if curl -fsSL --max-time 60 "${_pre}${_url}" -o "$_tmpzip" 2>/dev/null \
+         && unzip -tqq "$_tmpzip" >/dev/null 2>&1; then
+        _got=1; break
+      fi
+    done
+    if [ -z "$_got" ]; then
+      say_err "✗ couldn't download $_zip (GitHub + mirrors failed) — later: gtmux install-app" \
+              "✗ 下载 $_zip 失败(GitHub 与镜像都不行)—— 之后可: gtmux install-app"
+    else
+      mkdir -p "$HOME/Applications"
+      rm -rf "$HOME/Applications/Gtmux.app"
+      ditto -x -k "$_tmpzip" "$HOME/Applications/"
+      xattr -dr com.apple.quarantine "$HOME/Applications/Gtmux.app" 2>/dev/null || true
+      # Rollback: stop it + remove the bundle.
+      printf 'pkill -f %q 2>/dev/null; rm -rf %q && echo "  %s: %s"\n' \
+        "Gtmux.app/Contents/MacOS/gtmux-menubar" "$HOME/Applications/Gtmux.app" \
+        "$R_REMOVED" "$HOME/Applications/Gtmux.app" >> "$ROLLBACK"
+      open "$HOME/Applications/Gtmux.app" 2>/dev/null || true
+      say "✓ Gtmux.app installed + launched — menu-bar icon shows ⏸/⠿/✳ + count; click a row to jump" \
+          "✓ 已安装并启动 Gtmux.app —— 菜单栏图标显示 ⏸/⠿/✳ + 计数;点某行即跳转"
+      say "  auto-start at login:  gtmux install-app --login   ·   remove: gtmux uninstall-app" \
+          "  开机自启:gtmux install-app --login   ·   卸载:gtmux uninstall-app"
+    fi
+    rm -rf "$_tmpd" 2>/dev/null
+  fi
+else
+  say "ℹ Skipped. Install anytime: gtmux install-app (or re-run this installer)." \
+      "ℹ 已跳过。随时可装:gtmux install-app(或重跑本脚本)。"
 fi
 
 # ---- done / 完成 -----------------------------------------------------------
