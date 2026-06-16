@@ -37,12 +37,11 @@ session: saas (project)
        └─ pane 1 | pane 2  ← split a window further when needed
 ```
 
-## Two tab/split systems coexist — heads up
+## Two tab/split systems coexist
 
 With tmux on top, Ghostty's own tabs/splits (`cmd+t`/`cmd+d`) and tmux's
-(`prefix c`/`prefix |`) both exist. **Recommendation: once inside tmux, use only
-tmux's windows/panes and keep a single Ghostty window as the "canvas"** — otherwise
-the two keymaps clash.
+(`prefix c`/`prefix |`) both exist. Once inside tmux, use only tmux's windows/panes
+and keep a single Ghostty window as the canvas. Otherwise the two keymaps clash.
 
 ## The prefix key
 

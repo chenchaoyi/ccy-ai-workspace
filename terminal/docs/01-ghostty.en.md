@@ -5,8 +5,8 @@
 ## What this config does
 
 Replicates Warp "phenomenon" dark feel (Hack 15pt, near-black bg, warm off-white
-fg, periwinkle cursor) plus agent-friendly settings (bell attention, jump between
-prompts, large scrollback, etc.).
+fg, periwinkle cursor). Adds agent-friendly settings: bell attention, jump between
+prompts, large scrollback.
 
 ## Contrast / "glare" finding ⭐
 
@@ -47,12 +47,12 @@ state is dropped on quit → only geometry comes back.
 1. **Enable native restore**: `defaults write -g NSQuitAlwaysKeepsWindows -bool true`
    (or uncheck that box). Global, best-effort.
 2. **Switch to tmux** (this repo's choice): the session lives in a background
-   process, so cwd/layout/running processes never die; with resurrect/continuum it
-   even survives reboots. More thorough than native restore.
+   process, so cwd/layout/running processes survive. With resurrect/continuum it
+   survives reboots. More thorough than native restore.
 
-> Snapshot tools also evaluated: **gtab** (lightweight named workspaces),
+> Snapshot tools also evaluated: **gtab** (named workspaces),
 > **crex/cmux-resurrect** (auto-snapshot daemon, restores running processes),
-> **ghostty-workspace** (declarative YAML). Conclusion: for heavy use go tmux — see `04`.
+> **ghostty-workspace** (declarative YAML). For heavy use, go tmux; see `04`.
 
 ## Config load-path gotcha
 

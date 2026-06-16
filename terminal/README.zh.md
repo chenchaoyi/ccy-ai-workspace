@@ -2,26 +2,22 @@
 
 > 🌏 **English version: [README.md](./README.md)** · 以下为中文版。
 
-我本地终端环境的**配置 + 用法 + 决策记录**,纳入版本管理,方便:
-- 换一台新机器时**一键复原**;
-- **分享**给同事直接抄。
+我本地终端环境的配置、用法与决策记录，纳入版本管理，方便换一台新机器时一键复原。
 
 ## 目录结构
 
 ```
 terminal/
 ├── README.md            英文版
-├── README.zh.md         ← 你在这里:总览 + 一键复原
+├── README.zh.md         总览 + 一键复原
 ├── install.sh           一键软链配置到系统位置 + 装 tpm
 ├── ghostty/
 │   └── config           Ghostty 配置(柔和暗色 / agent 友好)
 ├── tmux/
 │   ├── tmux.conf        tmux 配置(保留默认 Ctrl+b 前缀)
 │   └── cheatsheet.txt   前缀+g 弹窗显示的命令速查表
-│   (gtmux 命令行已拆成独立仓库:github.com/chenchaoyi/gtmux ——
-│    install.sh 用它的 curl 一行命令装到 ~/.local/bin/gtmux)
-│   (agent 完成通知 + 点击直达确切 pane 由 gtmux 自带的 hook 提供;
-│    install.sh 通过 `gtmux install-hooks` 启用)
+│   (gtmux 命令行在独立仓库:github.com/chenchaoyi/gtmux；install.sh
+│    负责安装并启用它的 agent 完成 hook)
 ├── shell/
 │   └── ghostty-cwd.bash macOS bash 3.2 的目录上报(让新窗口继承工作目录)
 └── docs/
@@ -52,9 +48,9 @@ bash terminal/install.sh              # English output(默认)
 脚本会**拷贝**配置到:
 - `~/.config/ghostty/config`
 - `~/.tmux.conf`
-- `~/.local/bin/gtmux`(命令行工具,任意目录可调用,见下文 ——
-  刻意【不】写进任何 shell 的 rc 文件,所以无论你用 bash/zsh/fish 都能用)
-- `~/.ghostty-cwd.bash`(仅 bash 用户需要 —— 见下文"新窗口继承工作目录")
+- `~/.local/bin/gtmux`（命令行工具，任意目录可调用；不写进任何 shell 的 rc 文件，
+  所以无论你用 bash/zsh/fish 都能用）
+- `~/.ghostty-cwd.bash`（仅 bash 用户需要 —— 见下文「新窗口继承工作目录」）
 
 并克隆 tpm。已存在的旧文件会自动备份成 `*.bak.<时间戳>`。
 
@@ -69,9 +65,9 @@ bash terminal/install.sh              # English output(默认)
 
 ## 背景知识:Ghostty 与 tmux 的概念分层
 
-最容易混淆的点:**Ghostty 和 tmux 各有自己的 "window",但完全是两回事**。
-一句话类比:**Ghostty 是显示器,tmux 是主机**。拔掉显示器(quit Ghostty),
-主机里的东西(session)照样跑;重新接上(`gtmux restore`)画面就回来了。
+容易混淆的点：**Ghostty 和 tmux 各有自己的 window，但完全是两回事**。类比：
+Ghostty 是显示器，tmux 是主机。quit Ghostty 后 session 照样跑，`gtmux restore`
+把画面接回来。
 
 **上层 —— Ghostty,负责"显示"(GUI 程序,Cmd+Q 就没了):**
 
@@ -124,67 +120,34 @@ tmux server(整台机器只有一个,装着所有状态)
 这个"名字写在 tab 上"的绑定,也正是 `gtmux focus <session>` 能直接跳到对应
 tab 的原因 —— 写的一侧(`set-titles`)和读的一侧(`focus`)是同一套能力。
 
-## `gtmux` 命令行 —— tmux 会话与 coding agent 的指挥台
+## `gtmux` 命令行
 
-`gtmux` 是你 tmux 会话、以及里面跑着的 coding agent 的指挥台 —— **`agents`**(谁在跑 /
-空闲 / 等你)、**`overview`**(看会话)、**`restore`**(重建 tab)、**`focus`**(跳到
-tab/pane)。它不是 spawner:是覆盖你已经在 tmux 里跑的一切的"雷达 + 遥控器"。
-
-它维护在**独立仓库 —— [github.com/chenchaoyi/gtmux](https://github.com/chenchaoyi/gtmux)**,
-完整 CLI 文档都在那边。`install.sh`(第 3 步)用它的 curl 一行命令替你安装(预编译、经
-校验和验证的二进制;优先 GitHub,失败回退国内镜像,无需 Go 工具链):
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/chenchaoyi/gtmux/main/install.sh | bash
-```
-
-### 本工作环境怎么把它接进来
-
-gtmux 只是个 CLI;下面这些键绑定在本仓库的 `tmux/tmux.conf` 里(还有
-`set-titles-string '#S — #W'`,`focus` 靠它定位 tab):
+`gtmux` 是查看 tmux 会话、以及里面跑着的 coding agent 的命令行（也有可选的菜单栏
+app）。`install.sh` 负责安装，并询问是否装菜单栏 app。下面这些键绑定在本仓库的
+`tmux/tmux.conf` 里（还有 `set-titles-string '#S — #W'`，`gtmux focus` 靠它定位
+tab）：
 
 | 键 | 跑 | 作用 |
 | --- | --- | --- |
-| `前缀 + g` | `gtmux overview --popup` | session/window/pane 弹窗,悬浮在任何全屏程序之上 |
-| `前缀 + a` | `gtmux agents --watch --popup` | 实时 agent 面板(↑/↓ 选 · Enter 跳 · q 退;跳转后自动关) |
-| `前缀 + G` | 速查表 | tmux 命令速查表(`~/.tmux-cheatsheet.txt`) |
+| `前缀 + g` | `gtmux overview --popup` | session/window/pane 弹窗，悬浮在任何全屏程序之上 |
+| `前缀 + a` | `gtmux agents --watch --popup` | 实时 agent 面板（↑/↓ 选 · Enter 跳 · q 退；跳转后自动关） |
+| `前缀 + G` | 速查表 | tmux 命令速查表（`~/.tmux-cheatsheet.txt`） |
 | `前缀 + J` | `gtmux focus $(cat …/last-finished)` | 跳到最近完成的那个 agent 的 pane |
 
-Ghostty 重启后,在任意 tab 里跑一次 **`gtmux restore`**,把每个 tmux session 接回到各自
-的 tab(电脑重启后它还会启动 tmux 并等 tmux-continuum —— 在 `tmux.conf` 里配置 —— 恢复
-最近一次存档)。`⏸ 等输入` / `✓ latest` 这些 agent 信号、以及点击直达的通知,都来自 gtmux
-自带的 hook —— `install.sh` 通过 `gtmux install-hooks` 启用(见下一节)。
+Ghostty 重启后，在任意 tab 里跑一次 **`gtmux restore`**，把每个 tmux session 接回到各自
+的 tab（电脑重启后它还会启动 tmux 并等 tmux-continuum —— 在 `tmux.conf` 里配置 —— 恢复
+最近一次存档）。
 
-**菜单栏 app(可选)**:`install.sh`(第 8 步)还会询问是否安装 **`Gtmux.app`** ——
-一个 macOS 状态栏图标,实时显示 agent 状态(⏸ 等你 / ⠿ 运行中 / ✳ 空闲 + 计数),点某行就
-跳到那个 pane。它是 `gtmux agents` 的 GUI 形态,数据同源。用 `gtmux install-app [--login]` /
-`gtmux uninstall-app` 管理。
+其余一切见 [gtmux 仓库](https://github.com/chenchaoyi/gtmux)：命令、agent 检测与
+`agents.json`、restore 各模式、`--json`、菜单栏 app、镜像选项。
 
-完整的逐命令文档(agent 检测与 `agents.json`、restore 各模式、`--json`、镜像选项等)见
-[gtmux 仓库 README](https://github.com/chenchaoyi/gtmux/blob/main/README.zh.md)。
+## agent 完成通知（Claude Code）
 
-## agent 完成通知,点击直达"确切 pane"(Claude Code)
+`install.sh`（可选步骤）通过 gtmux 的 hook，在 Claude Code 的 agent 跑完时弹桌面通知，
+点击直达确切 pane。`前缀 + J` 用键盘做同样的跳转。检测到 peon-ping 时，`install.sh`
+会关掉 peon 自己的通知，免得双弹。
 
-不用 tmux 时,Claude Code 的 agent 跑完,Ghostty 会弹原生通知,点一下就跳到那个
-tab。**在 tmux 下这条路是断的** —— tmux 会丢掉那条裸通知转义序列。gtmux 用自带的 hook
-把它补回来,而且**落到 agent 当时所在的那个确切 pane**;`install.sh`(第 7 步)用
-**`gtmux install-hooks --yes`** 替你启用 —— opt-in,因为要改 `~/.claude/settings.json`
-(有备份、幂等、保留你已有的钩子):
-
-- **任意** tmux session 里 agent 完成都会弹桌面通知 —— 包括你没在看的那些 ——
-  并且**你正盯着该 session 的 Ghostty tab 时保持安静**。
-- **点击通知 → 直接跳到那个确切 pane**:gtmux 生成一个极小的中转 app
-  **`GtmuxFocus.app`** 作为点击落点(新版 macOS 上点击只能"激活 app",不能跑命令),
-  它跑 `gtmux focus --last` 落到刚完成的 pane。首次点击会弹「GtmuxFocus 想要控制
-  Ghostty」—— 允许一次即可。
-- **`前缀 + J`** 用键盘做同样的跳转。
-- `terminal-notifier` 让通知可点击 —— `install.sh` 会提示帮你 `brew install`(回车即装);
-  没装也有可靠的原生通知,只是不可点。
-- 检测到 peon-ping 时,`install.sh` 会关掉 peon 自己的桌面通知(和 `terminal_tab_title`),
-  免得双弹或跟 `set-titles` 抢标题。
-
-hook 本身(`gtmux hook`)、`~/.local/share/gtmux/` 下的状态文件、以及通知器内部细节都在
-[gtmux 仓库](https://github.com/chenchaoyi/gtmux);`gtmux uninstall-hooks` 可一键撤销。
+机制（hook、点击中转 app、状态文件）见 [gtmux 仓库](https://github.com/chenchaoyi/gtmux)。
 
 ## 新窗口继承工作目录
 
@@ -209,10 +172,9 @@ tmux.conf 已开 `allow-passthrough on`),常驻 tmux 时 Ghostty 也能拿到真
 | pane 切换 | **vi 风格 h/j/k/l**(方向键也可) | 习惯 vim 手感 |
 | 持久化 | tmux + resurrect + continuum | 跨重启恢复 session/window/cwd,比快照工具更彻底 |
 | tab 命名 | 名字起在 tmux 的 session/window 上,**`set-titles` 自动映射到 Ghostty tab 标题** | 名字活在状态层 —— quit/重启不丢,`gtmux restore` 接回后自动正确,零手动命名 |
-| 工作区命令行 | **一个 `gtmux`**(Go):`overview` · `agents` · `restore` · `focus` | 一个命令管整个工作区 + 多 agent 状态;`--lang=en|zh` |
-| 现在跑着什么? | **前缀+g** session 概览弹窗(shell 里也可 `gtmux overview`) | 一眼看清 session/window/pane 数量与明细 |
-| agent 完成提醒 | gtmux 自带 hook(`gtmux install-hooks`):完成弹通知,**点击→ 确切 pane**(靠 `GtmuxFocus.app`);也可 `前缀+J` | 补回 tmux 下被掐断的"点击直达"通知,精确落到 agent 所在 pane;在看时不打扰;不依赖 peon |
-| 忘了按键? | **前缀+G** 速查表弹窗;前缀+? 全量键位;前缀+/ 再按某键=解释它 | 不离开 tmux 随手查 |
+| 工作区命令行 | **`gtmux`** | 一个命令管整个工作区 + 多 agent 状态；见 [gtmux 仓库](https://github.com/chenchaoyi/gtmux) |
+| agent 完成提醒 | gtmux 自带 hook：完成弹通知，点击→确切 pane；也可 `前缀+J` | 补回 tmux 下被掐断的「点击直达」通知；在看时不打扰；不依赖 peon。见 [gtmux 仓库](https://github.com/chenchaoyi/gtmux) |
+| 忘了按键？ | **前缀+G** 速查表弹窗；前缀+? 全量键位；前缀+/ 再按某键=解释它 | 不离开 tmux 随手查 |
 | 并行 agent | 一项目一 session,任务分 window | 见 docs/04 |
 
 详细取舍与背景见 `docs/`。

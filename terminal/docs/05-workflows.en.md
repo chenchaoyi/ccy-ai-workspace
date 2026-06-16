@@ -8,12 +8,12 @@ A laptop screen is small. Cramming many panes into one window makes Claude Code'
 prompt and history feel tight. The principle:
 
 - **Needs reading/typing room → give it a whole window** (Claude Code sessions,
-  editors). A window is a full-screen tab; `prefix + number` switches instantly and
-  is basically "free", so **prefer more windows over more panes**.
+  editors). A window is a full-screen tab; `prefix + number` switches instantly, so
+  **prefer more windows over more panes**.
 - **Only glanced at occasionally → use a pane** (dev server logs, git status, a
   scratch shell). Narrow is fine for logs.
-- **`prefix + z` (zoom)** is your friend: even with a split, press z to temporarily
-  full-screen the active pane to read history, press z again to restore.
+- **`prefix + z` (zoom)**: even with a split, press z to full-screen the active pane
+  to read history, press z again to restore.
 - Keep **one maximized Ghostty window** as the canvas; let tmux own the layout so the
   two keymaps don't clash.
 - Browse Claude history: `prefix + [` enters copy mode, `/` to search, `Ctrl-u/d` to
@@ -21,8 +21,8 @@ prompt and history feel tight. The principle:
 
 > Rule of thumb: on a 13–14" laptop at a comfortable font, roughly **one Claude Code
 > session full-width** reads comfortably. Two side-by-side panes each get half-width,
-> and Claude's input box + history get cramped. So side-by-side is for *brief
-> comparison only*; sustained work uses windows + zoom.
+> and Claude's input box + history get cramped. Use side-by-side for brief comparison
+> only; sustained work uses windows + zoom.
 
 ---
 
@@ -33,7 +33,7 @@ windows split by *task*:
 
 ```
 session: saas
-├─ 0 claude   ← Claude Code, full window (where you live)
+├─ 0 claude   ← Claude Code, full window
 ├─ 1 dev      ← dev server / test watch (Claude reads logs; you glance)
 ├─ 2 git      ← lazygit for diffs / commits
 └─ 3 shell    ← scratch shell for ad-hoc commands (optional)
@@ -115,9 +115,9 @@ different project → `tmux new -s another-name`. `prefix + s` jumps between ses
 
 ## Browsing repo structure & file contents in the terminal
 
-Honestly: **for deep reading / go-to-definition / global search, an IDE (Cursor) is
-still better — don't force everything into the terminal.** The value of terminal tools
-is **a quick look without leaving / breaking flow while an agent runs.** A good set:
+For deep reading / go-to-definition / global search, an IDE (Cursor) is still better;
+don't force everything into the terminal. The value of terminal tools is a quick look
+without breaking flow while an agent runs. A good set:
 
 | Purpose | Tool | Notes |
 |---------|------|-------|
@@ -131,9 +131,9 @@ is **a quick look without leaving / breaking flow while an agent runs.** A good 
 Install (macOS): `brew install eza bat ripgrep fzf yazi lazygit`
 
 **Positioning**: keep Cursor for deep reading / refactoring / multi-file navigation;
-use `bat`/`eza`/`rg`/`fzf`/`lazygit`/`yazi` for "quick look while an agent runs". They
-coexist fine — Cursor can open the same worktree/repo dirs tmux uses. Add a tmux `code`
-window running `yazi` or `nvim` and you rarely leave the terminal just to glance at a file.
+use `bat`/`eza`/`rg`/`fzf`/`lazygit`/`yazi` for a quick look while an agent runs. They
+coexist; Cursor can open the same worktree/repo dirs tmux uses. Add a tmux `code`
+window running `yazi` or `nvim` and you rarely leave the terminal to glance at a file.
 
 > Tip: Ghostty's `cmd+shift+up/down` (jump between prompts) works in bare Ghostty, but
 > **once inside tmux** those marks may not pass through; to browse Claude history in

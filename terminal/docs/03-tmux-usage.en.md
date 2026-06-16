@@ -45,10 +45,9 @@ session: saas
 > running program (everything shows "bash" — useless). This config instead:
 > **unnamed windows show their directory** (e.g. `saas`), and a **manual name via
 > `prefix + ,` sticks** (e.g. `claude`/`dev`/`git`); programs can't silently rename
-> them. A `•` appears in the status bar when a background window has new output —
-> handy for spotting "which agent just finished". **Name each window by role** so the
-> status bar tells you what every window is doing at a glance. To peek at all windows,
-> `prefix + w` opens a window tree with live preview.
+> them. A `•` appears in the status bar when a background window has new output, so
+> you can spot which agent just finished. Name each window by role. `prefix + w`
+> opens a window tree with live preview.
 
 ### Pane (split)
 | Action | Key |
@@ -86,12 +85,12 @@ This config installs **tmux-resurrect + tmux-continuum**:
 - resurrect does the actual save/restore (with `@resurrect-capture-pane-contents on`,
   pane contents are saved too).
 
-First run: inside tmux press `prefix + I` (capital) to install plugins. After that
-it's basically invisible — reboot, kill tmux, run `tmux` again and you're back.
+First run: inside tmux press `prefix + I` (capital) to install plugins. After that,
+reboot or kill tmux, run `tmux` again, and you're back.
 
 > This is the thorough fix for the original Ghostty lost-cwd pain: the session lives
-> in a background process, so directories and running processes never die; even after
-> a reboot, continuum pulls the layout and directories back.
+> in a background process, so directories and running processes survive. After a
+> reboot, continuum pulls the layout and directories back.
 
 ## Tips for pairing with Claude Code
 - Put the dev server in its own window; an agent can read it via

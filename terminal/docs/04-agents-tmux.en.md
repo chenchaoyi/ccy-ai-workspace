@@ -14,7 +14,7 @@ agents". Agent processes need exactly what tmux has had since 2007:
 - **Scriptable**: agents know `capture-pane` / `send-keys` — read other panes, send
   keys to other panes.
 
-> In short: "a 2007 multiplexer became the runtime for 2026 AI agents."
+A 2007 multiplexer became the runtime for 2026 AI agents.
 
 ## The hardest reason for Ghostty users ⚠️
 
@@ -29,7 +29,8 @@ one project = one tmux session (named after the project)
   ├─ window: claude   main Claude Code
   ├─ window: dev      dev server (agents read its logs)
   └─ window: git      diffs
-3–5 parallel agents is the sweet spot (matches official guidance).
+3–5 parallel agents is the sweet spot (matches official guidance);
+beyond that, coordination overhead > benefit.
 ```
 
 ## Parallel agents: git worktree + tmux
