@@ -10,7 +10,8 @@
 terminal/
 ├── README.md            英文版
 ├── README.zh.md         总览 + 一键复原
-├── install.sh           一键软链配置到系统位置 + 装 tpm
+├── install.sh           拷贝配置到系统位置 + 装 gtmux;
+│                        其余交给 `gtmux doctor --fix` 收尾
 ├── ghostty/
 │   └── config           Ghostty 配置(柔和暗色 / agent 友好)
 ├── tmux/
@@ -32,10 +33,9 @@ terminal/
 ## 一键复原(新机器)
 
 ```bash
-# 前置:已装好 Ghostty(>= 1.3)和 tmux(>= 3.3)
-#   brew install --cask ghostty ; brew install tmux
 git clone git@github.com:chenchaoyi/ccy-ai-workspace.git
 cd ccy-ai-workspace
+brew bundle --file=Brewfile           # Ghostty(>= 1.3)、tmux(>= 3.3)及周边工具
 bash terminal/install.sh --lang=zh    # 中文输出
 bash terminal/install.sh              # English output(默认)
 ```
@@ -52,7 +52,10 @@ bash terminal/install.sh              # English output(默认)
   所以无论你用 bash/zsh/fish 都能用）
 - `~/.ghostty-cwd.bash`（仅 bash 用户需要 —— 见下文「新窗口继承工作目录」）
 
-并克隆 tpm。已存在的旧文件会自动备份成 `*.bak.<时间戳>`。
+已存在的旧文件会自动备份(并生成 `rollback.sh` 一键回滚)。配置文件之外的
+一切 —— tmux 插件(tpm + resurrect + continuum)、Claude Code 通知 hook、
+菜单栏 app —— 随后交给 **`gtmux doctor --fix`** 完成:它逐项解释并征求确认,
+且自带备份。之后随时可跑 `gtmux doctor` 做健康检查。
 
 > 用拷贝而非软链:这些配置很少改动,直接拷贝更简单、不易乱套。在 repo 里改完后,
 > **重跑 `bash terminal/install.sh`** 即可应用。
@@ -60,7 +63,8 @@ bash terminal/install.sh              # English output(默认)
 ## 装完之后
 
 1. **Ghostty**:重开,或窗口内按 `Cmd+Shift+,` 重载。
-2. **tmux**:启动 `tmux` → 按 `Ctrl+b` 然后 `I`(大写)安装插件。
+2. **tmux**:先 `tmux kill-server` 再开 `tmux` —— 插件已由 `gtmux doctor --fix`
+   装好,无需 `前缀+I`。
 3. **验证持久化**:`Ctrl+b` 然后 `Ctrl-s` 手动存一次;重启 tmux 应自动恢复布局与各窗格目录。
 
 ## 背景知识:Ghostty 与 tmux 的概念分层
@@ -143,9 +147,10 @@ Ghostty 重启后，在任意 tab 里跑一次 **`gtmux restore`**，把每个 t
 
 ## agent 完成通知（Claude Code）
 
-`install.sh`（可选步骤）通过 gtmux 的 hook，在 Claude Code 的 agent 跑完时弹桌面通知，
-点击直达确切 pane。`前缀 + J` 用键盘做同样的跳转。检测到 peon-ping 时，`install.sh`
-会关掉 peon 自己的通知，免得双弹。
+`install.sh` 的 `gtmux doctor --fix` 步骤会注册 gtmux 的 hook：Claude Code 的
+agent 跑完时弹桌面通知，点击直达确切 pane（通知横幅由菜单栏 app 发出）。
+`前缀 + J` 用键盘做同样的跳转。装有 peon-ping 的话跑一次 `gtmux install-hooks`——
+它会关掉 peon 自己的通知，免得双弹。
 
 机制（hook、点击中转 app、状态文件）见 [gtmux 仓库](https://github.com/chenchaoyi/gtmux)。
 

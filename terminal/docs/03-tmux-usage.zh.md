@@ -78,7 +78,7 @@ session: saas
 - continuum 每 ~15 分钟自动存档，且 **tmux 启动时自动恢复**上次的 session/window/pane 布局与**各 pane 的 cwd**。
 - resurrect 负责实际的存/恢复（已开 `@resurrect-capture-pane-contents on`，连 pane 内容一起存）。
 
-首次使用：进 tmux 后 `前缀 + I`（大写）装插件。之后重启电脑、关掉 tmux，再开 `tmux` 就回来了。
+插件由 `gtmux doctor --fix`（`install.sh` 的一部分）装好，无需 `前缀 + I`。重启电脑、关掉 tmux，再开 `tmux` 就回来了。
 
 > 这正是当初 Ghostty 丢 cwd 痛点的彻底解法：session 活在后台进程里，目录和运行中的进程都不死；
 > 即使重启，continuum 也能把布局与目录拉回来。

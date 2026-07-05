@@ -85,8 +85,8 @@ This config installs **tmux-resurrect + tmux-continuum**:
 - resurrect does the actual save/restore (with `@resurrect-capture-pane-contents on`,
   pane contents are saved too).
 
-First run: inside tmux press `prefix + I` (capital) to install plugins. After that,
-reboot or kill tmux, run `tmux` again, and you're back.
+The plugins are installed by `gtmux doctor --fix` (part of `install.sh`) — no
+`prefix + I` needed. Reboot or kill tmux, run `tmux` again, and you're back.
 
 > This is the thorough fix for the original Ghostty lost-cwd pain: the session lives
 > in a background process, so directories and running processes survive. After a

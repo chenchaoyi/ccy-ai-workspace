@@ -50,7 +50,9 @@ server   后台一个常驻进程(几乎不用管)
 ## 基本用法
 
 ```bash
-# 把配置装到机器上(拷贝 + 备份,顺带装 tpm)
+# 一次装齐:先 brew 依赖,再配置 + gtmux
+# (插件 / hook / 菜单栏 app 由 `gtmux doctor --fix` 收尾)
+brew bundle --file=Brewfile
 bash terminal/install.sh
 
 # 为某项目起一个 session
@@ -62,7 +64,7 @@ tmux new -s saas
 tmux attach -t saas   # 稍后回来——现场都还在
 ```
 
-持久化是自动的（resurrect + continuum）：首次 `前缀 + I` 装好插件后，布局与各 pane 的目录会在下次 tmux 启动时自动恢复。
+持久化是自动的（resurrect + continuum，上面的安装流程会装好插件）：布局与各 pane 的目录会在下次 tmux 启动时自动恢复。
 
 ## 实战场景 —— 三种工作流
 
@@ -96,13 +98,14 @@ session shop:  0 web   1 api   2 shared   3 servers(web|api 两 pane)   4 git
 
 深度阅读/导航，IDE（Cursor）仍更强。想在 agent 跑着时快速查一眼，加这套：
 `eza --tree`（结构）、`bat`（看文件）、`ripgrep` + `fzf`（搜索/跳转）、`lazygit`（git）、`yazi`（文件管理器）。
-安装：`brew install eza bat ripgrep fzf yazi lazygit`。详见 [docs/05](./terminal/docs/05-workflows.zh.md)。
+这些都已收进仓库根目录的 [`Brewfile`](./Brewfile)（`brew bundle --file=Brewfile`）。详见 [docs/05](./terminal/docs/05-workflows.zh.md)。
 
 ## 目录结构
 
 ```
 ccy-ai-workspace/
 ├── README.md / README.zh.md   总览（英文 / 中文）
+├── Brewfile                    全部 Homebrew 依赖，一条 `brew bundle` 装齐
 └── terminal/                  Ghostty + tmux 配置、安装脚本、文档
     ├── ghostty/config
     ├── tmux/tmux.conf

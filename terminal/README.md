@@ -11,7 +11,8 @@ control so I can restore it on a new machine in one command.
 terminal/
 ├── README.md            overview + one-command restore
 ├── README.zh.md         中文版
-├── install.sh           symlink configs into place + install tpm
+├── install.sh           copy configs into place + install gtmux;
+│                        the rest is finished by `gtmux doctor --fix`
 ├── ghostty/
 │   └── config           Ghostty config (soft dark / agent-friendly)
 ├── tmux/
@@ -33,10 +34,9 @@ terminal/
 ## One-command restore (new machine)
 
 ```bash
-# Prereq: Ghostty (>= 1.3) and tmux (>= 3.3) installed
-#   brew install --cask ghostty ; brew install tmux
 git clone git@github.com:chenchaoyi/ccy-ai-workspace.git
 cd ccy-ai-workspace
+brew bundle --file=Brewfile           # Ghostty (>= 1.3), tmux (>= 3.3), extras
 bash terminal/install.sh              # English output (default)
 bash terminal/install.sh --lang=zh    # 中文输出
 ```
@@ -55,7 +55,11 @@ The script **copies** configs to:
 - `~/.ghostty-cwd.bash` (only needed by bash users — see "Working-directory
   inheritance" below)
 
-and clones tpm. Existing files are auto-backed-up as `*.bak.<timestamp>`.
+Existing files are auto-backed-up (with a generated `rollback.sh`). Everything
+beyond the config files — tmux plugins (tpm + resurrect + continuum), the Claude
+Code notification hook, the menu-bar app — is then handed off to
+**`gtmux doctor --fix`**, which explains and confirms each change and keeps its
+own backups. You can re-run `gtmux doctor` anytime as a health check.
 
 > Copy, not symlink: configs change rarely, so a plain copy keeps things simple and
 > avoids surprises. After editing files in the repo, **re-run `bash terminal/install.sh`**
@@ -64,7 +68,8 @@ and clones tpm. Existing files are auto-backed-up as `*.bak.<timestamp>`.
 ## After install
 
 1. **Ghostty**: reopen, or press `Cmd+Shift+,` to reload.
-2. **tmux**: run `tmux` → press `Ctrl+b` then `I` (capital) to install plugins.
+2. **tmux**: `tmux kill-server` then `tmux` — plugins were already installed by
+   `gtmux doctor --fix`, no `prefix+I` needed.
 3. **Verify persistence**: `Ctrl+b` then `Ctrl-s` to save once; restart tmux and
    the layout + each pane's cwd should auto-restore.
 
@@ -152,10 +157,12 @@ app, and mirror options.
 
 ## Agent-done notifications (Claude Code)
 
-`install.sh` (optional) enables desktop notifications when a Claude Code agent
-finishes, with click-to-jump to the exact pane, via gtmux's hook. `prefix + J`
-does the same jump from the keyboard. If peon-ping is present, `install.sh`
-silences peon's own notifications so you don't get double banners.
+The `gtmux doctor --fix` step of `install.sh` registers gtmux's hook, which
+delivers a desktop notification when a Claude Code agent finishes, with
+click-to-jump to the exact pane (the menu-bar app posts the banners). `prefix + J`
+does the same jump from the keyboard. If peon-ping is present, run
+`gtmux install-hooks` once — it silences peon's own notifications so you don't
+get double banners.
 
 For the mechanism (the hook, click-target app, state files), see the
 [gtmux repo](https://github.com/chenchaoyi/gtmux).

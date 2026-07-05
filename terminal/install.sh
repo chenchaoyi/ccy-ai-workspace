@@ -8,13 +8,21 @@
 #
 # What it does / 做什么:
 #   - Ghostty config      -> ~/.config/ghostty/config
-#   - tmux config         -> ~/.tmux.conf
+#   - tmux config         -> ~/.tmux.conf (+ cheatsheet)
 #   - gtmux CLI           -> ~/.local/bin/gtmux (overview / agents / restore / focus)
 #                            installed via github.com/chenchaoyi/gtmux curl one-liner
 #   - cwd reporter        -> ~/.ghostty-cwd.bash (for macOS bash 3.2)
-#   - tpm + tmux plugins (headless, no prefix+I needed)
-#   - Claude Code notifications (optional) -> gtmux install-hooks
-#   - gtmux menu-bar app   (optional) -> ~/Applications/Gtmux.app (macOS)
+#   - everything else     -> delegated to `gtmux doctor --fix`: tmux plugins
+#                            (tpm/resurrect/continuum), set-titles, Claude Code
+#                            hook (notifications), menu-bar app. gtmux explains
+#                            each change, asks first, and keeps its own backups.
+#   - 其余设置            -> 交给 `gtmux doctor --fix`:tmux 插件(tpm/resurrect/
+#                            continuum)、set-titles、Claude Code hook(通知)、
+#                            菜单栏 app。gtmux 逐项解释并征求确认,且自带备份。
+#
+#   Homebrew packages (Ghostty, tmux, browsing tools): see repo-root Brewfile
+#   (`brew bundle --file=Brewfile`).
+#   Homebrew 包(Ghostty、tmux、翻代码工具)见仓库根目录 Brewfile。
 #
 # SAFETY / 安全:
 #   - Every replaced/removed file is backed up under
@@ -57,7 +65,8 @@ usage() {
 用法: bash terminal/install.sh [选项]
 
 一键安装本仓库的终端环境(macOS),全程可回滚:
-Ghostty 配置、tmux 配置、gtmux 命令行、目录上报片段、tpm 及插件。
+Ghostty 配置、tmux 配置、gtmux 命令行、目录上报片段;其余设置
+(插件/set-titles/通知 hook/菜单栏 app)由 `gtmux doctor --fix` 完成。
 
 选项:
   --lang=en|zh   输出语言(默认 en)
@@ -79,7 +88,8 @@ EOF
 Usage: bash terminal/install.sh [OPTIONS]
 
 One-shot, rollbackable installer for this repo's terminal setup (macOS):
-Ghostty config, tmux config, gtmux CLI, cwd reporter, tpm + plugins.
+Ghostty config, tmux config, gtmux CLI, cwd reporter; the rest (plugins /
+set-titles / notification hook / menu-bar app) is done by `gtmux doctor --fix`.
 
 Options:
   --lang=en|zh   Output language (default: en)
@@ -132,11 +142,9 @@ trap 'on_err $LINENO' ERR
 if [ "$UI_LANG" = zh ]; then
   R_HEAD="正在回滚 terminal 配置安装($TS)..."
   R_RESTORED="已还原"; R_REMOVED="已删除新建文件"
-  R_PLUGDIR="已删除插件目录"; R_PLUG="已删除插件"
 else
   R_HEAD="Rolling back terminal config install ($TS)..."
   R_RESTORED="restored"; R_REMOVED="removed (was new)"
-  R_PLUGDIR="removed plugins dir"; R_PLUG="removed plugin"
 fi
 mkdir -p "$BACKUP_DIR"
 cat > "$ROLLBACK" <<EOF
@@ -235,33 +243,6 @@ offer_brew_upgrade() {  # <brew upgrade args...>
   fi
 }
 
-# Yes/no prompt: --yes auto-confirms; otherwise ask only on a TTY; default NO
-# (so non-interactive runs never silently opt into side effects).
-# 是非询问:--yes 自动确认;否则仅在交互终端询问;默认【否】
-# (非交互运行绝不悄悄开启有副作用的动作)。
-confirm() {  # confirm <en-prompt> <zh-prompt> -> 0 if yes (default NO)
-  if [ "$ASSUME_YES" = 1 ]; then return 0; fi
-  if [ -t 0 ]; then
-    sayn "$1" "$2"
-    IFS= read -r _ans || _ans=""
-    case "$_ans" in y|Y|yes|YES) return 0;; *) return 1;; esac
-  fi
-  return 1
-}
-
-# Like confirm() but defaults to YES on an empty answer (Enter = yes). Use for
-# steps that are part of a feature the user already opted into.
-# 同 confirm(),但回车=是(默认 YES)。用于用户已选定功能内部的步骤。
-confirm_yes() {  # confirm_yes <en-prompt> <zh-prompt> -> 0 unless explicitly declined
-  if [ "$ASSUME_YES" = 1 ]; then return 0; fi
-  if [ -t 0 ]; then
-    sayn "$1" "$2"
-    IFS= read -r _ans || _ans="y"
-    case "$_ans" in n|N|no|NO) return 1;; *) return 0;; esac
-  fi
-  return 0
-}
-
 say "== preflight ==" "== 预检 =="
 
 # tmux: presence + version floor + newer-version offer
@@ -323,7 +304,7 @@ fi
 say "  backups + rollback: $BACKUP_DIR" "  备份与回滚: $BACKUP_DIR"
 
 # ---- 1) Ghostty config / Ghostty 配置 -------------------------------------
-say "== 1/8 Ghostty config ==" "== 1/8 Ghostty 配置 =="
+say "== 1/5 Ghostty config ==" "== 1/5 Ghostty 配置 =="
 install_file "$DIR/ghostty/config" "$HOME/.config/ghostty/config"
 # Legacy non-standard config.ghostty: back it up and disable to avoid double-load
 # 旧的非标准 config.ghostty:备份并停用,避免与新配置重复加载
@@ -338,7 +319,7 @@ if [ -e "$LEGACY" ]; then
 fi
 
 # ---- 2) tmux config + cheatsheet / tmux 配置 + 速查表 -----------------------
-say "== 2/8 tmux config ==" "== 2/8 tmux 配置 =="
+say "== 2/5 tmux config ==" "== 2/5 tmux 配置 =="
 install_file "$DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
 # Quick-reference shown by the prefix+g popup / 前缀+g 弹窗显示的速查表
 install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
@@ -350,7 +331,7 @@ install_file "$DIR/tmux/cheatsheet.txt" "$HOME/.tmux-cheatsheet.txt"
 # 安装到 PATH(~/.local/bin)的独立命令行,与 shell 配置无关。一个命令三个动词:
 # `gtmux restore`(一键接回全部 session)、`gtmux overview`(前缀+g 弹窗,也可直接跑)、
 # `gtmux focus <名字>`(跳到对应 tab)。
-say "== 3/8 CLI tool (gtmux) ==" "== 3/8 命令行工具(gtmux)=="
+say "== 3/5 CLI tool (gtmux) ==" "== 3/5 命令行工具(gtmux)=="
 # gtmux now lives in its own repo (github.com/chenchaoyi/gtmux) and is installed
 # via its curl one-liner, which fetches a prebuilt, checksum-verified binary
 # (GitHub-first, with a CN mirror-chain fallback). No local Go toolchain needed.
@@ -430,70 +411,8 @@ esac
 # macOS 自带 /bin/bash(3.2)没有 Ghostty 自动 shell 集成,新窗口/新 tab 无法
 # 继承工作目录。该片段补上最小化 OSC 7 上报(tmux 内同样生效)。bash 用户在
 # .bashrc 里 source 它 —— 见结尾说明。
-say "== 4/8 cwd reporter ==" "== 4/8 目录上报片段 =="
+say "== 4/5 cwd reporter ==" "== 4/5 目录上报片段 =="
 install_file "$DIR/shell/ghostty-cwd.bash" "$HOME/.ghostty-cwd.bash"
-
-# ---- 5) tpm (non-fatal) / tpm(失败不致命)--------------------------------
-say "== 5/8 tpm (tmux plugin manager) ==" "== 5/8 tpm(tmux 插件管理器)=="
-TPM="$HOME/.tmux/plugins/tpm"
-PLUGINS_DIR="$HOME/.tmux/plugins"
-FRESH_TPM=0
-if [ -d "$TPM" ]; then
-  say "✓ tpm already installed (untouched)" "✓ tpm 已安装(未改动)"
-elif ! command -v git >/dev/null 2>&1; then
-  say "⚠ git not found, skipping tpm" "⚠ 未找到 git,跳过 tpm"
-  say "  later: git clone https://github.com/tmux-plugins/tpm $TPM" \
-      "  稍后手动: git clone https://github.com/tmux-plugins/tpm $TPM"
-else
-  if git clone --depth=1 https://github.com/tmux-plugins/tpm "$TPM" 2>/dev/null; then
-    FRESH_TPM=1
-    say "✓ tpm cloned" "✓ tpm 已克隆"
-  else
-    say "⚠ tpm clone failed (network?) — configs are unaffected" \
-        "⚠ tpm 克隆失败(可能无网络)—— 配置不受影响"
-    say "  later: git clone https://github.com/tmux-plugins/tpm $TPM" \
-        "  稍后手动: git clone https://github.com/tmux-plugins/tpm $TPM"
-  fi
-fi
-
-# ---- 6/6 install tmux plugins headlessly / 无头自动安装 tmux 插件 ----------
-# No need to press prefix+I by hand — installed here via an ISOLATED tmux server
-# (-L socket) so your running tmux, if any, is never touched.
-# 不用手动按 前缀+I —— 这里用【独立 socket 的 tmux server】自动装好,绝不碰你正在跑的 tmux。
-say "== 6/8 tmux plugins ==" "== 6/8 tmux 插件 =="
-if [ -x "$TPM/bin/install_plugins" ] && command -v tmux >/dev/null 2>&1; then
-  NEW_PLUGINS=""
-  for p in tmux-resurrect tmux-continuum; do
-    [ -d "$PLUGINS_DIR/$p" ] || NEW_PLUGINS="$NEW_PLUGINS $p"
-  done
-  SOCK="tpm-bootstrap-$$"
-  if tmux -L "$SOCK" new-session -d -x 200 -y 50 2>/dev/null; then
-    tmux -L "$SOCK" source-file "$HOME/.tmux.conf" 2>/dev/null || true
-    tmux -L "$SOCK" run-shell "$TPM/bin/install_plugins" 2>/dev/null || true
-    tmux -L "$SOCK" kill-server 2>/dev/null || true
-  fi
-  if [ -d "$PLUGINS_DIR/tmux-resurrect" ] && [ -d "$PLUGINS_DIR/tmux-continuum" ]; then
-    say "✓ plugins installed (resurrect + continuum) — nothing manual needed" \
-        "✓ 插件已自动安装(resurrect + continuum),无需手动操作"
-    # rollback: if WE created tpm the whole plugins dir is ours; else drop only new ones
-    # 回滚:若 tpm 是本次新建,整个 plugins 目录都是我们的;否则只删本次新增的插件
-    if [ "$FRESH_TPM" = 1 ]; then
-      printf 'rm -rf %q && echo "  %s: %s"\n' "$PLUGINS_DIR" "$R_PLUGDIR" "$PLUGINS_DIR" >> "$ROLLBACK"
-    else
-      for p in $NEW_PLUGINS; do
-        printf 'rm -rf %q && echo "  %s: %s"\n' "$PLUGINS_DIR/$p" "$R_PLUG" "$p" >> "$ROLLBACK"
-      done
-    fi
-  else
-    say "⚠ auto-install incomplete — inside tmux press prefix (Ctrl+b) + I to finish" \
-        "⚠ 自动安装未完成 —— 进 tmux 后按 前缀(Ctrl+b)+ I 手动补装"
-    [ "$FRESH_TPM" = 1 ] && printf 'rm -rf %q\n' "$TPM" >> "$ROLLBACK"
-  fi
-else
-  say "⚠ tpm/tmux not ready — inside tmux press prefix (Ctrl+b) + I" \
-      "⚠ tpm/tmux 未就绪 —— 进 tmux 后按 前缀(Ctrl+b)+ I"
-  [ "$FRESH_TPM" = 1 ] && printf 'rm -rf %q\n' "$TPM" >> "$ROLLBACK"
-fi
 
 # ---- terminfo sanity check / terminfo 检查 --------------------------------
 if ! infocmp tmux-256color >/dev/null 2>&1; then
@@ -501,168 +420,42 @@ if ! infocmp tmux-256color >/dev/null 2>&1; then
       "⚠ 未找到 tmux-256color terminfo —— tmux 内颜色或按键可能异常(修复: brew install ncurses)"
 fi
 
-# ---- 7) Claude Code agent-done notifications (optional) --------------------
-# Desktop notification when an agent finishes in any tmux session, with a click
-# that jumps to its exact Ghostty tab/pane. This is now provided by gtmux itself:
-# `gtmux hook` writes the agent state + fires the notification, and
-# `gtmux install-hooks` registers it (Stop/Notification/UserPromptSubmit) and
-# generates the GtmuxFocus.app click target. Opt-in (edits ~/.claude/settings.json).
-# Replaces the old bash claude-notify hook, which is migrated away below.
-# "agent 完成"桌面通知 + 点击直达确切 Ghostty tab/pane,现已由 gtmux 自带:
-# `gtmux hook` 写状态并发通知,`gtmux install-hooks` 注册钩子(Stop/Notification/
-# UserPromptSubmit)并生成点击落点 GtmuxFocus.app。opt-in(要改 ~/.claude/settings.json)。
-# 取代旧的 bash claude-notify(下面会自动迁移掉)。
-say "== 7/8 Claude Code notifications (optional) ==" "== 7/8 Claude Code 完成通知(可选)=="
-CLAUDE_DIR="$HOME/.claude"
-SETTINGS="$CLAUDE_DIR/settings.json"
+# ---- 5) finish setup via gtmux / 其余设置交给 gtmux ------------------------
+# Everything beyond the config files is gtmux's own domain, and `gtmux doctor
+# --fix` now handles all of it: tmux plugins (tpm/resurrect/continuum, cloned
+# directly — no prefix+I needed), set-titles + restore options (skipped when our
+# tmux.conf already provides them), the Claude Code hook (agent-done
+# notifications; the menu-bar app delivers them — terminal-notifier is no longer
+# used), and the menu-bar app itself. It explains each change, asks first
+# (--yes applies all), and keeps its OWN backups (~/.tmux.conf.gtmux.bak,
+# settings.json backups) — so this part is outside our rollback.sh.
+# 配置文件之外的设置都属于 gtmux 自己的领域,现在由 `gtmux doctor --fix` 一站完成:
+# tmux 插件(tpm/resurrect/continuum,直接 clone,无需 prefix+I)、set-titles 与
+# 恢复选项(我们的 tmux.conf 已提供时自动跳过)、Claude Code hook(agent 完成通知;
+# 通知由菜单栏 app 发出,不再依赖 terminal-notifier)、以及菜单栏 app 本身。
+# 它逐项解释并征求确认(--yes 全部应用),且自带备份(~/.tmux.conf.gtmux.bak、
+# settings.json 备份)—— 这部分不在本脚本的 rollback.sh 范围内。
+say "== 5/5 finish setup (gtmux doctor --fix) ==" "== 5/5 完成其余设置(gtmux doctor --fix)=="
 GTMUX_BIN="$HOME/.local/bin/gtmux"
-if [ ! -d "$CLAUDE_DIR" ]; then
-  say "ℹ Claude Code not detected (~/.claude absent) — skipping notification setup" \
-      "ℹ 未检测到 Claude Code(无 ~/.claude)—— 跳过通知设置"
-elif [ ! -x "$GTMUX_BIN" ]; then
-  say "⚠ gtmux not installed — skipping notifications (re-run after gtmux is installed)" \
-      "⚠ 未安装 gtmux —— 跳过通知(gtmux 装好后重跑本脚本)"
-elif confirm "Enable 'agent finished' desktop notifications? [y/N] " \
-             "启用「agent 完成」桌面通知吗?[y/N] "; then
-  # Back up settings.json (and peon config) up front so rollback restores the
-  # exact pre-install state — `gtmux install-hooks --yes` mutates both.
-  # 先备份 settings.json(及 peon 配置),让回滚能还原到安装前 —— install-hooks --yes 会改它们。
-  if [ -f "$SETTINGS" ]; then
-    sbak="$(safe_backup "$SETTINGS")"; record_restore "$SETTINGS" "$sbak"
-  else
-    record_remove "$SETTINGS"
-  fi
-  PEON_CFG="$CLAUDE_DIR/hooks/peon-ping/config.json"
-  if [ -f "$PEON_CFG" ]; then
-    pbak="$(safe_backup "$PEON_CFG")"; record_restore "$PEON_CFG" "$pbak"
-  fi
-
-  # Migrate off the old bash claude-notify: drop its hook entries + binary so we
-  # don't double-fire (install-hooks dedupes on basename 'gtmux', not the old
-  # script name). safe_backup keeps rollback intact.
-  # 迁移掉旧的 bash claude-notify:删掉它的 hook 条目和二进制,避免双弹
-  #(install-hooks 按 basename 'gtmux' 去重,认不出旧脚本名)。备份后再删,回滚不受影响。
-  if [ -f "$HOME/.local/bin/claude-notify" ]; then
-    cnbak="$(safe_backup "$HOME/.local/bin/claude-notify")"
-    record_restore "$HOME/.local/bin/claude-notify" "$cnbak"
-    rm -f "$HOME/.local/bin/claude-notify"
-    if [ -f "$SETTINGS" ]; then
-      python3 - "$SETTINGS" <<'PY' || true
-import json, sys
-p = sys.argv[1]
-try:
-    cfg = json.load(open(p))
-except Exception:
-    sys.exit(0)
-hooks = cfg.get('hooks', {})
-for ev, groups in list(hooks.items()):
-    kept = []
-    for g in groups:
-        if not isinstance(g, dict):
-            kept.append(g); continue
-        hs = [h for h in (g.get('hooks') or [])
-              if 'claude-notify' not in ((h or {}).get('command') or '')]
-        if hs:
-            g['hooks'] = hs; kept.append(g)
-    if kept:
-        hooks[ev] = kept
-    else:
-        del hooks[ev]
-json.dump(cfg, open(p, 'w'), indent=2)
-PY
-    fi
-    say "↪ migrated off bash claude-notify → now via 'gtmux hook' (backup: $cnbak)" \
-        "↪ 已从 bash claude-notify 迁移 → 改用 'gtmux hook'(备份: $cnbak)"
-  fi
-
-  # terminal-notifier makes the notification clickable (click → exact pane).
-  # Install by default since click-through is the point; decline keeps a plain banner.
-  # terminal-notifier 让通知可点击(点击→确切 pane)。点击直达是核心,所以默认装;按 n 则普通通知。
-  if ! command -v terminal-notifier >/dev/null 2>&1 && command -v brew >/dev/null 2>&1; then
-    if confirm_yes "  Install terminal-notifier (clickable notifications) via Homebrew? [Y/n] " \
-                   "  用 Homebrew 装 terminal-notifier(可点击通知)吗?[Y/n] "; then
-      brew install terminal-notifier \
-        && say "✓ terminal-notifier installed" "✓ 已装 terminal-notifier" \
-        || say "  ⚠ install failed — notifications still work (not clickable)" \
-               "  ⚠ 安装失败 —— 通知仍可用(不可点击)"
-    fi
-  fi
-
-  # Hand off to gtmux: generates GtmuxFocus.app + caches the icon + registers the
-  # hook on Stop/Notification/UserPromptSubmit, and (--yes) quiets peon-ping.
-  # 交给 gtmux:生成 GtmuxFocus.app + 缓存图标 + 注册 hook,并(--yes)关掉 peon 的通知/标题。
-  if "$GTMUX_BIN" install-hooks --yes; then
-    record_remove "$HOME/.local/share/gtmux/notify-icon.png"
-    printf 'rm -rf %q && echo "  %s: %s"\n' "$HOME/Applications/GtmuxFocus.app" "$R_REMOVED" "$HOME/Applications/GtmuxFocus.app" >> "$ROLLBACK"
-    say "✓ notifications enabled via gtmux (click → jump to the exact pane)" \
-        "✓ 已由 gtmux 启用通知(点击 → 跳到确切 pane)"
-    say "  first click prompts 'GtmuxFocus wants to control Ghostty' — allow it once" \
-        "  首次点击会弹「GtmuxFocus 想要控制 Ghostty」,允许一次即可"
-    say "→ Reload: restart Claude Code (or run /hooks) so the new hook takes effect." \
-        "→ 生效:重启 Claude Code(或执行 /hooks)让新钩子加载。"
-  else
-    say "⚠ 'gtmux install-hooks' failed — notifications not enabled (try: gtmux install-hooks)" \
-        "⚠ 'gtmux install-hooks' 失败 —— 通知未启用(可手动: gtmux install-hooks)"
-  fi
+if [ ! -x "$GTMUX_BIN" ]; then
+  say "⚠ gtmux not installed — finish later with: gtmux doctor --fix" \
+      "⚠ 未安装 gtmux —— 稍后手动完成: gtmux doctor --fix"
+elif ! command -v tmux >/dev/null 2>&1; then
+  say "⚠ tmux not installed — after installing it, run: gtmux doctor --fix" \
+      "⚠ 未安装 tmux —— 装好后运行: gtmux doctor --fix"
+elif [ "$ASSUME_YES" = 1 ]; then
+  "$GTMUX_BIN" --lang="$UI_LANG" doctor --fix --yes \
+    || say "⚠ 'gtmux doctor --fix' reported problems — re-run: gtmux doctor --fix" \
+           "⚠ 'gtmux doctor --fix' 报告了问题 —— 可重跑: gtmux doctor --fix"
+elif [ -t 0 ]; then
+  say "ℹ handing off to gtmux — it asks before each change (Ctrl-C skips the rest)" \
+      "ℹ 交给 gtmux —— 每个改动它都会先询问(Ctrl-C 跳过剩余步骤)"
+  "$GTMUX_BIN" --lang="$UI_LANG" doctor --fix \
+    || say "⚠ 'gtmux doctor --fix' reported problems — re-run: gtmux doctor --fix" \
+           "⚠ 'gtmux doctor --fix' 报告了问题 —— 可重跑: gtmux doctor --fix"
 else
-  say "ℹ Skipped. Re-run this installer anytime to enable agent-done notifications." \
-      "ℹ 已跳过。想启用「agent 完成」通知随时重跑本安装脚本即可。"
-fi
-
-# ---- 8) gtmux menu-bar app (optional, macOS) ------------------------------
-# Gtmux.app — a status-bar app showing live agent state (⏸ waiting / ⠿ working /
-# ✳ idle) with a count, click a row to jump to that pane. It's a universal,
-# ad-hoc-signed .app shipped as a zip on the gtmux release (separate from the
-# cgo-free CLI). Opt-in; macOS only (it's a .app). Downloaded GitHub-first with a
-# CN mirror fallback, matching the CLI's installed version.
-# Gtmux.app —— 菜单栏状态栏 app:实时显示 agent 状态(⏸ 等你 / ⠿ 运行中 / ✳ 空闲)+ 计数,
-# 点某行就跳到那个 pane。它是 gtmux 发布里附带的 universal、ad-hoc 签名 .app(zip,独立于
-# cgo-free 的 CLI)。opt-in;仅 macOS。优先 GitHub、失败走国内镜像,版本与已装 CLI 对齐。
-say "== 8/8 gtmux menu-bar app (optional) ==" "== 8/8 gtmux 菜单栏 app(可选)=="
-if [ "$(uname -s)" != "Darwin" ]; then
-  say "ℹ Not macOS — skipping the menu-bar app" "ℹ 非 macOS —— 跳过菜单栏 app"
-elif [ ! -x "$HOME/.local/bin/gtmux" ]; then
-  say "⚠ gtmux not installed — skipping the menu-bar app" "⚠ 未安装 gtmux —— 跳过菜单栏 app"
-elif confirm "Install the gtmux menu-bar app (Gtmux.app)? [y/N] " \
-             "安装 gtmux 菜单栏 app(Gtmux.app)吗?[y/N] "; then
-  _gver="$("$HOME/.local/bin/gtmux" --version 2>/dev/null | awk '{print $2}')"
-  if [ -z "$_gver" ]; then
-    say_err "⚠ couldn't determine gtmux version — skipping app (later: gtmux install-app)" \
-            "⚠ 无法确定 gtmux 版本 —— 跳过 app(之后可: gtmux install-app)"
-  else
-    _zip="Gtmux-${_gver}-macos.zip"
-    _url="https://github.com/chenchaoyi/gtmux/releases/download/v${_gver}/${_zip}"
-    _tmpd="$(mktemp -d)"; _tmpzip="$_tmpd/$_zip"; _got=""
-    # Same direct→mirror fallback the CLI installer uses (GitHub assets stall on CN).
-    for _pre in "" "https://ghfast.top/" "https://gh-proxy.com/"; do
-      if curl -fsSL --max-time 60 "${_pre}${_url}" -o "$_tmpzip" 2>/dev/null \
-         && unzip -tqq "$_tmpzip" >/dev/null 2>&1; then
-        _got=1; break
-      fi
-    done
-    if [ -z "$_got" ]; then
-      say_err "✗ couldn't download $_zip (GitHub + mirrors failed) — later: gtmux install-app" \
-              "✗ 下载 $_zip 失败(GitHub 与镜像都不行)—— 之后可: gtmux install-app"
-    else
-      mkdir -p "$HOME/Applications"
-      rm -rf "$HOME/Applications/Gtmux.app"
-      ditto -x -k "$_tmpzip" "$HOME/Applications/"
-      xattr -dr com.apple.quarantine "$HOME/Applications/Gtmux.app" 2>/dev/null || true
-      # Rollback: stop it + remove the bundle.
-      printf 'pkill -f %q 2>/dev/null; rm -rf %q && echo "  %s: %s"\n' \
-        "Gtmux.app/Contents/MacOS/gtmux-menubar" "$HOME/Applications/Gtmux.app" \
-        "$R_REMOVED" "$HOME/Applications/Gtmux.app" >> "$ROLLBACK"
-      open "$HOME/Applications/Gtmux.app" 2>/dev/null || true
-      say "✓ Gtmux.app installed + launched — menu-bar icon shows ⏸/⠿/✳ + count; click a row to jump" \
-          "✓ 已安装并启动 Gtmux.app —— 菜单栏图标显示 ⏸/⠿/✳ + 计数;点某行即跳转"
-      say "  auto-start at login:  gtmux install-app --login   ·   remove: gtmux uninstall-app" \
-          "  开机自启:gtmux install-app --login   ·   卸载:gtmux uninstall-app"
-    fi
-    rm -rf "$_tmpd" 2>/dev/null
-  fi
-else
-  say "ℹ Skipped. Install anytime: gtmux install-app (or re-run this installer)." \
-      "ℹ 已跳过。随时可装:gtmux install-app(或重跑本脚本)。"
+  say "ℹ non-interactive run — finish setup later with: gtmux doctor --fix" \
+      "ℹ 非交互运行 —— 稍后完成其余设置: gtmux doctor --fix"
 fi
 
 # ---- done / 完成 -----------------------------------------------------------
@@ -672,13 +465,14 @@ if [ "$UI_LANG" = zh ]; then
 完成 ✅
 
 回滚:  bash "$ROLLBACK"
-  (把 Ghostty 与 tmux 完全还原到本次安装前的状态)
+  (还原本脚本安装的配置文件;gtmux doctor --fix 的改动由 gtmux 自身备份,
+   如 ~/.tmux.conf.gtmux.bak 与 settings.json 备份)
 
 接下来:
   1) Ghostty:重开,或按 Cmd+Shift+, 重载配置
-  2) tmux:先 'tmux kill-server' 再开 'tmux' —— 插件已自动装好,直接用
+  2) tmux:先 'tmux kill-server' 再开 'tmux' —— 插件由 doctor --fix 装好,直接用
   3) 验证持久化:前缀 + Ctrl-s 手动存一次
-  注意:在 repo 里改了配置后,需重跑本脚本才生效。
+  注意:在 repo 里改了配置后,需重跑本脚本才生效。随时可跑 'gtmux doctor' 体检。
 
 gtmux —— tmux 会话与 coding agent 的指挥台(四个动词;裸 gtmux 看帮助):
   gtmux agents [--watch]   看 agent:谁在跑/空闲/等你(--watch 实时面板;也可 前缀+a)
@@ -705,13 +499,16 @@ else
 Done ✅
 
 ROLLBACK:  bash "$ROLLBACK"
-  (restores Ghostty + tmux to exactly how they were before this run)
+  (restores the config files this script installed; changes made by
+   'gtmux doctor --fix' have gtmux's own backups, e.g. ~/.tmux.conf.gtmux.bak
+   and settings.json backups)
 
 Next steps:
   1) Ghostty: reopen, or press Cmd+Shift+, to reload the config
-  2) tmux: 'tmux kill-server' then 'tmux' — plugins are already installed
+  2) tmux: 'tmux kill-server' then 'tmux' — plugins were installed by doctor --fix
   3) Verify persistence: prefix + Ctrl-s to save once
   Note: repo edits are NOT live until you re-run this script.
+  Health check anytime: 'gtmux doctor'.
 
 gtmux — command center for tmux sessions + coding agents (four verbs; bare gtmux = help):
   gtmux agents [--watch]  AGENTS: who's working / idle / waiting on you (--watch live; or prefix+a)
@@ -724,7 +521,7 @@ gtmux — command center for tmux sessions + coding agents (four verbs; bare gtm
       gtmux restore --pick   (list sessions, choose which)
       gtmux restore --one    (attach the next unattached session here)
       gtmux restore <name>   (a specific session)
-  After a machine REBOOT (tmux server gone) `gtmux restore` still works: it starts
+  After a machine REBOOT (tmux server gone) 'gtmux restore' still works: it starts
   tmux and tmux-continuum restores the last autosave (every 5 min; dirs + screen
   text come back, running programs are not restarted).
 

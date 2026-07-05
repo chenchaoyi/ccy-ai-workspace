@@ -60,7 +60,9 @@ server   one background daemon (you rarely touch it)
 ## Basic usage
 
 ```bash
-# install configs onto a machine (copies + backups, installs tpm)
+# install everything onto a machine: brew deps, then configs + gtmux
+# (plugins / hooks / menu-bar app are finished by `gtmux doctor --fix`)
+brew bundle --file=Brewfile
 bash terminal/install.sh
 
 # start a session for a project
@@ -72,8 +74,8 @@ tmux new -s saas
 tmux attach -t saas   # come back later — everything still there
 ```
 
-Persistence is automatic (resurrect + continuum): after `prefix + I` installs the
-plugins once, layout and each pane's directory restore on the next tmux start.
+Persistence is automatic (resurrect + continuum, installed by the setup above):
+layout and each pane's directory restore on the next tmux start.
 
 ## Recipes — three workflows
 
@@ -110,8 +112,8 @@ session shop:  0 web   1 api   2 shared   3 servers(web|api panes)   4 git
 
 For deep reading/navigation, an IDE (Cursor) is still better. For a quick look while
 an agent runs, add: `eza --tree` (structure), `bat` (view files), `ripgrep` + `fzf`
-(search/jump), `lazygit` (git), `yazi` (file manager). Install:
-`brew install eza bat ripgrep fzf yazi lazygit`. Details in
+(search/jump), `lazygit` (git), `yazi` (file manager). All included in the
+repo-root [`Brewfile`](./Brewfile) (`brew bundle --file=Brewfile`). Details in
 [docs/05](./terminal/docs/05-workflows.en.md).
 
 ## Layout
@@ -119,6 +121,7 @@ an agent runs, add: `eza --tree` (structure), `bat` (view files), `ripgrep` + `f
 ```
 ccy-ai-workspace/
 ├── README.md / README.zh.md   overview (EN / 中文)
+├── Brewfile                    every Homebrew dep in one `brew bundle`
 └── terminal/                  Ghostty + tmux configs, install script, docs
     ├── ghostty/config
     ├── tmux/tmux.conf
